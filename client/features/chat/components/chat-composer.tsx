@@ -1,0 +1,66 @@
+"use client";
+
+import { useState } from "react";
+import { Loader2Icon, SendIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+
+type ChatComposerProps = {
+    onSubmit: (text: string) => void;
+    disabled?: boolean;
+    isStreaming?: boolean;
+};
+
+export function ChatComposer({
+    onSubmit,
+    disabled = false,
+    isStreaming = false,
+}: ChatComposerProps) {
+    const [input, setInput] = useState("");
+
+    function handleSubmit(event: React.FormEvent) {
+        event.preventDefault();
+        const text = input.trim();
+        if (!text || disabled || isStreaming) {
+            return;
+        }
+
+        onSubmit(text);
+        setInput("");
+    }
+
+    return (
+        <form
+            onSubmit={handleSubmit}
+            className="border-t bg-background p-4"
+        >
+            <div className="mx-auto flex max-w-3xl items-end gap-2">
+                <Textarea
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    placeholder="Ask about your sources…"
+                    rows={1}
+                    className="min-h-[44px] max-h-40 resize-none"
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                            event.preventDefault();
+                            handleSubmit(event);
+                        }
+                    }}
+                    disabled={disabled || isStreaming}
+                />
+                <Button
+                    type="submit"
+                    size="icon"
+                    disabled={disabled || isStreaming || !input.trim()}
+                >
+                    {isStreaming ? (
+                        <Loader2Icon className="animate-spin" />
+                    ) : (
+                        <SendIcon />
+                    )}
+                </Button>
+            </div>
+        </form>
+    );
+}

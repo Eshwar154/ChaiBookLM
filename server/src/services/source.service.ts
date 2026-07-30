@@ -1,5 +1,7 @@
 import { uploadPdfToCloudinary } from "../lib/cloudinary.js";
+import { extractPdfFromBuffer } from "../lib/pdf.js";
 import { scrapeWebsite } from "../lib/firecrawl.js";
+import { enqueueSourceProcessing } from "../lib/source-events.js";
 import { fetchYoutubeTranscript } from "../lib/youtube.js";
 import {
     createSourceRecord,
@@ -16,9 +18,23 @@ import type {
     ImportYoutubeInput,
     ListSourcesQuery,
 } from "../validators/source.validator.js";
+import { listChunksForSource, removeSourceFromIndex } from "./source-processing.service.js";
 
 async function assertWorkspaceAccess(workspaceId: string, userId: string) {
     await getWorkspaceByIdForUser(workspaceId, userId);
+}
+
+async function createAndProcessSource(
+    data: Parameters<typeof createSourceRecord>[0],
+) {
+    const source = await createSourceRecord(data);
+
+    await enqueueSourceProcessing({
+        sourceId: source.id,
+        workspaceId: source.workspaceId,
+    });
+
+    return source;
 }
 
 export async function listSourcesForWorkspace(
@@ -53,7 +69,7 @@ export async function createTextOrMarkdownSource(
 ) {
     await assertWorkspaceAccess(workspaceId, userId);
 
-    return createSourceRecord({
+    return createAndProcessSource({
         workspaceId,
         type: input.type,
         title: input.title,
@@ -75,16 +91,30 @@ export async function uploadPdfSource(
         file.originalname,
     );
 
-    return createSourceRecord({
+    let content: string | null = null;
+    let pageCount: number | undefined;
+
+    try {
+        const extracted = await extractPdfFromBuffer(file.buffer);
+        content = extracted.text;
+        pageCount = extracted.pageCount;
+    } catch {
+        // Inngest will retry extraction from Cloudinary if upload-time parse fails.
+    }
+
+    return createAndProcessSource({
         workspaceId,
         type: "PDF",
         title: title?.trim() || file.originalname.replace(/\.pdf$/i, ""),
+        content,
         status: "PENDING",
         metadata: {
             fileUrl: upload.secureUrl,
             fileName: upload.originalFilename,
             fileSize: upload.bytes,
             publicId: upload.publicId,
+            resourceType: upload.resourceType,
+            pageCount,
         },
     });
 }
@@ -98,7 +128,7 @@ export async function importWebsiteSource(
 
     const scraped = await scrapeWebsite(input.url);
 
-    return createSourceRecord({
+    return createAndProcessSource({
         workspaceId,
         type: "WEBSITE",
         title: input.title?.trim() || scraped.title || input.url,
@@ -120,7 +150,7 @@ export async function importYoutubeSource(
 
     const transcript = await fetchYoutubeTranscript(input.url);
 
-    return createSourceRecord({
+    return createAndProcessSource({
         workspaceId,
         type: "YOUTUBE",
         title: input.title?.trim() || `YouTube: ${transcript.videoId}`,
@@ -139,5 +169,15 @@ export async function deleteSourceForWorkspace(
     userId: string,
 ) {
     await getSourceForWorkspace(workspaceId, sourceId, userId);
+    await removeSourceFromIndex(workspaceId, sourceId);
     await deleteSourceRecord(sourceId);
+}
+
+export async function getSourceChunksForWorkspace(
+    workspaceId: string,
+    sourceId: string,
+    userId: string,
+) {
+    await getSourceForWorkspace(workspaceId, sourceId, userId);
+    return listChunksForSource(sourceId);
 }

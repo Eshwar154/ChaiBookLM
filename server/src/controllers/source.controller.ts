@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import {
     createTextOrMarkdownSource,
     deleteSourceForWorkspace,
+    getSourceChunksForWorkspace,
     getSourceForWorkspace,
     importWebsiteSource,
     importYoutubeSource,
@@ -116,6 +117,16 @@ export async function getSource(req: Request, res: Response) {
         req.session.user.id,
     );
     res.json(source);
+}
+
+export async function getSourceChunks(req: Request, res: Response) {
+    const { workspaceId, sourceId } = parseSourceParams(req.params);
+    const result = await getSourceChunksForWorkspace(
+        workspaceId,
+        sourceId,
+        req.session.user.id,
+    );
+    res.json(result);
 }
 
 export async function createSource(req: Request, res: Response) {

@@ -3,6 +3,7 @@ import {
     createSource,
     deleteSource,
     getSource,
+    getSourceChunks,
     importWebsite,
     importYoutube,
     listSources,
@@ -22,5 +23,6 @@ sourceRoutes.post(
 );
 sourceRoutes.post("/import/website", asyncHandler(importWebsite));
 sourceRoutes.post("/import/youtube", asyncHandler(importYoutube));
+sourceRoutes.get("/:sourceId/chunks", asyncHandler(getSourceChunks));
 sourceRoutes.get("/:sourceId", asyncHandler(getSource));
 sourceRoutes.delete("/:sourceId", asyncHandler(deleteSource));

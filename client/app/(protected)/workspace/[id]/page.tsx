@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireAuth } from "@/features/auth";
+import { WorkspaceChat } from "@/features/chat";
 import { getWorkspaceOrNull, WorkspaceShell } from "@/features/workspaces";
 
 type WorkspacePageProps = {
@@ -17,15 +18,7 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
 
     return (
         <WorkspaceShell workspace={workspace}>
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-                <p className="font-heading text-lg font-medium">
-                    Chat coming soon
-                </p>
-                <p className="max-w-md text-sm text-muted-foreground">
-                    Add sources from the sidebar to prepare this workspace for
-                    RAG chat in the next phase.
-                </p>
-            </div>
+            <WorkspaceChat workspaceId={workspace.id} />
         </WorkspaceShell>
     );
 }

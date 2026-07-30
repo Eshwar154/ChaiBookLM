@@ -4,6 +4,7 @@ import type {
     ImportWebsiteInput,
     ImportYoutubeInput,
     Source,
+    SourceChunksResponse,
     SourceFilters,
 } from "./types";
 
@@ -33,6 +34,12 @@ export function listSources(workspaceId: string, filters?: SourceFilters) {
 export function getSource(workspaceId: string, sourceId: string) {
     return apiFetch<Source>(
         `/api/workspaces/${workspaceId}/sources/${sourceId}`,
+    );
+}
+
+export function getSourceChunks(workspaceId: string, sourceId: string) {
+    return apiFetch<SourceChunksResponse>(
+        `/api/workspaces/${workspaceId}/sources/${sourceId}/chunks`,
     );
 }
 

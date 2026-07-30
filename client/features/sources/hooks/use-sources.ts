@@ -42,6 +42,14 @@ export function useSources(
     return useQuery({
         queryKey: sourceKeys(workspaceId).list(queryFilters),
         queryFn: () => listSources(workspaceId, queryFilters),
+        refetchInterval: (query) => {
+            const hasProcessing = query.state.data?.some(
+                (source) =>
+                    source.status === "PENDING" ||
+                    source.status === "PROCESSING",
+            );
+            return hasProcessing ? 3000 : false;
+        },
     });
 }
 
@@ -51,6 +59,12 @@ export function useSource(workspaceId: string, sourceId: string) {
         queryFn: () => getSource(workspaceId, sourceId),
         retry: (_, error) =>
             !(error instanceof ApiError && error.status === 404),
+        refetchInterval: (query) => {
+            const status = query.state.data?.status;
+            return status === "PENDING" || status === "PROCESSING"
+                ? 3000
+                : false;
+        },
     });
 }
 

@@ -46,3 +46,18 @@ export type ImportYoutubeInput = {
     url: string;
     title?: string;
 };
+
+export type SourceChunk = {
+    id: string;
+    sourceId: string;
+    index: number;
+    content: string;
+    tokenCount: number | null;
+    metadata: Record<string, unknown> | null;
+    createdAt: string;
+};
+
+export type SourceChunksResponse = {
+    chunks: SourceChunk[];
+    count: number;
+};
