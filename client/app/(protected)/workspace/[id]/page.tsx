@@ -19,11 +19,11 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
         <WorkspaceShell workspace={workspace}>
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
                 <p className="font-heading text-lg font-medium">
-                    Workspace ready
+                    Chat coming soon
                 </p>
                 <p className="max-w-md text-sm text-muted-foreground">
-                    Chat and sources will live here. Add knowledge sources in
-                    the next phase to start chatting with your books.
+                    Add sources from the sidebar to prepare this workspace for
+                    RAG chat in the next phase.
                 </p>
             </div>
         </WorkspaceShell>

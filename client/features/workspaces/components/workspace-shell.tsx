@@ -1,8 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, BookOpenIcon, MessageSquareIcon } from "lucide-react";
+import { usePathname } from "next/navigation";
+import {
+    ArrowLeftIcon,
+    BookOpenIcon,
+    MessageSquareIcon,
+    PlusIcon,
+} from "lucide-react";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
+import {
+    AddSourceDialog,
+    SourceSidebarList,
+    sourceRoutes,
+} from "@/features/sources";
 import { Button } from "@/components/ui/button";
 import {
     Sidebar,
@@ -29,6 +41,13 @@ type WorkspaceShellProps = {
 };
 
 export function WorkspaceShell({ workspace, children }: WorkspaceShellProps) {
+    const pathname = usePathname();
+    const [addSourceOpen, setAddSourceOpen] = useState(false);
+
+    const sourcesPath = sourceRoutes.list(workspace.id);
+    const isSourcesActive = pathname.startsWith(sourcesPath);
+    const isChatActive = !isSourcesActive;
+
     return (
         <SidebarProvider>
             <Sidebar>
@@ -54,13 +73,27 @@ export function WorkspaceShell({ workspace, children }: WorkspaceShellProps) {
                         <SidebarGroupContent>
                             <SidebarMenu>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton isActive>
+                                    <SidebarMenuButton
+                                        isActive={isChatActive}
+                                        render={
+                                            <Link
+                                                href={workspaceRoutes.detail(
+                                                    workspace.id,
+                                                )}
+                                            />
+                                        }
+                                    >
                                         <MessageSquareIcon />
                                         <span>Chat</span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton disabled>
+                                    <SidebarMenuButton
+                                        isActive={isSourcesActive}
+                                        render={
+                                            <Link href={sourcesPath} />
+                                        }
+                                    >
                                         <BookOpenIcon />
                                         <span>Sources</span>
                                     </SidebarMenuButton>
@@ -68,6 +101,11 @@ export function WorkspaceShell({ workspace, children }: WorkspaceShellProps) {
                             </SidebarMenu>
                         </SidebarGroupContent>
                     </SidebarGroup>
+
+                    <SourceSidebarList
+                        workspaceId={workspace.id}
+                        onAddSource={() => setAddSourceOpen(true)}
+                    />
                 </SidebarContent>
 
                 <SidebarFooter className="border-t border-sidebar-border">
@@ -93,11 +131,25 @@ export function WorkspaceShell({ workspace, children }: WorkspaceShellProps) {
                             {workspace.title}
                         </h1>
                     </div>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setAddSourceOpen(true)}
+                    >
+                        <PlusIcon />
+                        Add source
+                    </Button>
                     <SignOutButton />
                 </header>
 
                 <main className="flex flex-1 flex-col">{children}</main>
             </SidebarInset>
+
+            <AddSourceDialog
+                workspaceId={workspace.id}
+                open={addSourceOpen}
+                onOpenChange={setAddSourceOpen}
+            />
         </SidebarProvider>
     );
 }
