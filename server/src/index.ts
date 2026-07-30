@@ -3,7 +3,8 @@ import { toNodeHandler } from "better-auth/node";
 import cors from "cors";
 import express from "express";
 import { auth } from "./lib/auth.js";
-import { workspacesRouter } from "./routes/workspaces.js";
+import { errorHandler } from "./middleware/error-handler.middleware.js";
+import { registerRoutes } from "./routes/index.js";
 
 const app = express();
 const port = process.env.PORT ?? 8080;
@@ -27,7 +28,9 @@ app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
 });
 
-app.use("/api/workspaces", workspacesRouter);
+registerRoutes(app);
+
+app.use(errorHandler);
 
 app.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`);
