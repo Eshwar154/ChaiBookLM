@@ -4,7 +4,10 @@ export const authRoutes = {
     home: "/",
 } as const;
 
-export const protectedRoutes = [authRoutes.dashboard] as const;
+export const protectedRoutes = [
+    authRoutes.dashboard,
+    "/workspace",
+] as const;
 
 export const unauthenticatedRoutes = [authRoutes.login] as const;
 
