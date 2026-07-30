@@ -3,7 +3,7 @@ import {
     authRoutes,
     isProtectedRoute,
     isUnauthenticatedRoute,
-} from "@/lib/auth-routes";
+} from "@/features/auth";
 
 async function fetchSession(request: NextRequest) {
     const response = await fetch(

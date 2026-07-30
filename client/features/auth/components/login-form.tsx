@@ -18,8 +18,8 @@ import {
     FieldSeparator,
 } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
-import { authRoutes } from "@/lib/auth-routes";
-import { signIn } from "@/lib/auth-client";
+import { signIn } from "../lib/auth-client";
+import { authRoutes } from "../lib/auth-routes";
 
 function GoogleIcon({ className }: { className?: string }) {
     return (

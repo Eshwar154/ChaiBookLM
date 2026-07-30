@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "./auth-client";
 
 export type Session = typeof authClient.$Infer.Session;
 

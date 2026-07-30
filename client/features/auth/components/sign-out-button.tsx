@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { authRoutes } from "@/lib/auth-routes";
-import { signOut } from "@/lib/auth-client";
+import { signOut } from "../lib/auth-client";
+import { authRoutes } from "../lib/auth-routes";
 
 export function SignOutButton() {
     const router = useRouter();

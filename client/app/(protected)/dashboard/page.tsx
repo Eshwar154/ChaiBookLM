@@ -1,6 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { SignOutButton } from "@/components/auth/sign-out-button";
-import { requireAuth } from "@/lib/require-auth";
+import { requireAuth, SignOutButton } from "@/features/auth";
 
 function getInitials(name: string) {
     return name

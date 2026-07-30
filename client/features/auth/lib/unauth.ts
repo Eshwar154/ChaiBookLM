@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth-server";
-import { authRoutes } from "@/lib/auth-routes";
+import { authRoutes } from "./auth-routes";
+import { getSession } from "./auth-server";
 
 export async function unauth() {
     const session = await getSession();
