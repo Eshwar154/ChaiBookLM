@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BotIcon, MessageSquarePlusIcon, Trash2Icon } from "lucide-react";
 import {
     Message,
@@ -42,6 +43,7 @@ import { ChatMessageBody } from "./chat-message-body";
 import { CitationSources } from "./citation-sources";
 import { ChatComposer } from "./chat-composer";
 import type { ChatCitation } from "../lib/types";
+import { workspaceRoutes } from "@/features/workspaces/lib/routes";
 
 type WorkspaceChatProps = {
     workspaceId: string;
@@ -56,6 +58,10 @@ function getMessageText(message: UIMessage) {
 
 export function WorkspaceChat({ workspaceId }: WorkspaceChatProps) {
     const queryClient = useQueryClient();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const askPrompt = searchParams.get("ask");
+    const handledAskPrompt = useRef<string | null>(null);
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [citationsByMessageId, setCitationsByMessageId] = useState<
         Record<string, ChatCitation[]>
@@ -146,6 +152,30 @@ export function WorkspaceChat({ workspaceId }: WorkspaceChatProps) {
 
         setCitationsByMessageId(buildCitationMap(storedMessages));
     }, [storedMessages, status]);
+
+    useEffect(() => {
+        if (
+            !askPrompt ||
+            status !== "ready" ||
+            conversationId ||
+            messages.length > 0 ||
+            handledAskPrompt.current === askPrompt
+        ) {
+            return;
+        }
+
+        handledAskPrompt.current = askPrompt;
+        void sendMessage({ text: askPrompt });
+        router.replace(workspaceRoutes.detail(workspaceId));
+    }, [
+        askPrompt,
+        status,
+        conversationId,
+        messages.length,
+        sendMessage,
+        router,
+        workspaceId,
+    ]);
 
     async function handleNewChat() {
         setConversationId(null);

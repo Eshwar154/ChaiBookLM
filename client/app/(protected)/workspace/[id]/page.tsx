@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { requireAuth } from "@/features/auth";
 import { WorkspaceChat } from "@/features/chat";
-import { getWorkspaceOrNull, WorkspaceShell } from "@/features/workspaces";
+import { getWorkspaceOrNull } from "@/features/workspaces/lib/workspace-server";
+import { WorkspaceShell } from "@/features/workspaces";
 
 type WorkspacePageProps = {
     params: Promise<{ id: string }>;
@@ -18,7 +20,9 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
 
     return (
         <WorkspaceShell workspace={workspace}>
-            <WorkspaceChat workspaceId={workspace.id} />
+            <Suspense fallback={null}>
+                <WorkspaceChat workspaceId={workspace.id} />
+            </Suspense>
         </WorkspaceShell>
     );
 }

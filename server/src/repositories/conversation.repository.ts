@@ -5,6 +5,9 @@ export const conversationSelect = {
     id: true,
     workspaceId: true,
     title: true,
+    summary: true,
+    summaryMessageCount: true,
+    summarizedAt: true,
     createdAt: true,
     updatedAt: true,
 } as const;
@@ -18,6 +21,13 @@ export function findConversationsByWorkspaceId(workspaceId: string) {
         where: { workspaceId },
         select: conversationSelect,
         orderBy: { updatedAt: "desc" },
+    });
+}
+
+export function findConversationById(conversationId: string) {
+    return prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: conversationSelect,
     });
 }
 
@@ -36,6 +46,24 @@ export function createConversationRecord(workspaceId: string, title?: string) {
         data: {
             workspaceId,
             title: title ?? null,
+        },
+        select: conversationSelect,
+    });
+}
+
+export function updateConversationSummary(
+    conversationId: string,
+    data: {
+        summary: string;
+        summaryMessageCount: number;
+    },
+) {
+    return prisma.conversation.update({
+        where: { id: conversationId },
+        data: {
+            summary: data.summary,
+            summaryMessageCount: data.summaryMessageCount,
+            summarizedAt: new Date(),
         },
         select: conversationSelect,
     });

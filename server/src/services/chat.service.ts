@@ -8,9 +8,14 @@ import {
     toUIMessageStream,
     type UIMessage,
 } from "ai";
-import { CHAT_MODEL } from "../lib/ai-config.js";
 import {
-    buildRagSystemPrompt,
+    CHAT_MODEL,
+    CONVERSATION_SUMMARY_INTERVAL,
+    RECENT_MESSAGE_WINDOW,
+} from "../lib/ai-config.js";
+import { enqueueConversationSummarize } from "../lib/conversation-events.js";
+import {
+    buildChatSystemPrompt,
     retrieveWorkspaceContext,
     toChatCitations,
 } from "../lib/rag/retrieve.js";
@@ -24,8 +29,10 @@ import {
 } from "../repositories/conversation.repository.js";
 import {
     createMessageRecord,
+    countMessagesByConversationId,
     findMessagesByConversationId,
 } from "../repositories/message.repository.js";
+import { addMemoriesFromMessages, searchUserMemories } from "../lib/mem0.js";
 import { NotFoundError, ValidationError } from "../types/app-error.js";
 import {
     buildConversationTitle,
@@ -117,6 +124,32 @@ async function resolveConversation(
     );
 }
 
+function trimMessagesForContext(
+    messages: UIMessage[],
+    hasSummary: boolean,
+): UIMessage[] {
+    if (!hasSummary || messages.length <= RECENT_MESSAGE_WINDOW) {
+        return messages;
+    }
+
+    return messages.slice(-RECENT_MESSAGE_WINDOW);
+}
+
+async function maybeEnqueueConversationSummary(
+    conversationId: string,
+    userId: string,
+    messageCount: number,
+) {
+    if (
+        messageCount === 0 ||
+        messageCount % CONVERSATION_SUMMARY_INTERVAL !== 0
+    ) {
+        return;
+    }
+
+    await enqueueConversationSummarize({ conversationId, userId });
+}
+
 export async function streamWorkspaceChat(
     res: Response,
     workspaceId: string,
@@ -145,12 +178,22 @@ export async function streamWorkspaceChat(
         content: userText,
     });
 
-    const retrievedChunks = await retrieveWorkspaceContext(
-        workspaceId,
-        userText,
-    );
+    const [retrievedChunks, userMemories] = await Promise.all([
+        retrieveWorkspaceContext(workspaceId, userText),
+        searchUserMemories(userId, userText),
+    ]);
+
     const citations = toChatCitations(retrievedChunks);
-    const systemPrompt = buildRagSystemPrompt(retrievedChunks);
+    const systemPrompt = buildChatSystemPrompt({
+        chunks: retrievedChunks,
+        conversationSummary: conversation.summary,
+        userMemories: userMemories.map((memory) => memory.memory),
+    });
+
+    const contextMessages = trimMessagesForContext(
+        input.messages,
+        Boolean(conversation.summary),
+    );
 
     const stream = createUIMessageStream({
         originalMessages: input.messages,
@@ -158,7 +201,7 @@ export async function streamWorkspaceChat(
             const result = streamText({
                 model: openai(CHAT_MODEL),
                 system: systemPrompt,
-                messages: await convertToModelMessages(input.messages),
+                messages: await convertToModelMessages(contextMessages),
             });
 
             writer.merge(toUIMessageStream({ stream: result.stream }));
@@ -187,6 +230,30 @@ export async function streamWorkspaceChat(
                     title: buildConversationTitle(userText),
                 });
             }
+
+            const messageCount = await countMessagesByConversationId(
+                conversation.id,
+            );
+
+            await maybeEnqueueConversationSummary(
+                conversation.id,
+                userId,
+                messageCount,
+            );
+
+            void addMemoriesFromMessages(
+                userId,
+                [
+                    { role: "user", content: userText },
+                    { role: "assistant", content: assistantText },
+                ],
+                {
+                    source: "learned",
+                    conversationId: conversation.id,
+                },
+            ).catch((error) => {
+                console.error("Mem0 add failed:", error);
+            });
         },
     });
 

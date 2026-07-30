@@ -29,6 +29,12 @@ export function findMessagesByConversationId(conversationId: string) {
     });
 }
 
+export function countMessagesByConversationId(conversationId: string) {
+    return prisma.message.count({
+        where: { conversationId },
+    });
+}
+
 export function createMessageRecord(data: CreateMessageData) {
     return prisma.message.create({
         data: {

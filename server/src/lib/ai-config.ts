@@ -7,3 +7,6 @@ export const CHUNK_OVERLAP = 100;
 
 export const RAG_TOP_K = 6;
 export const RAG_MIN_SCORE = 0.35;
+
+export const CONVERSATION_SUMMARY_INTERVAL = 8;
+export const RECENT_MESSAGE_WINDOW = 12;

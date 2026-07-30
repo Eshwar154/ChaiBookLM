@@ -112,16 +112,48 @@ export function toChatCitations(chunks: RetrievedChunk[]): ChatCitation[] {
 }
 
 export function buildRagSystemPrompt(chunks: RetrievedChunk[]) {
-    if (chunks.length === 0) {
-        return [
-            "You are Chaibook, an assistant that helps users learn from their workspace sources.",
+    return buildChatSystemPrompt({ chunks });
+}
+
+export type UserMemoryContext = string;
+
+export function buildChatSystemPrompt(input: {
+    chunks: RetrievedChunk[];
+    conversationSummary?: string | null;
+    userMemories?: UserMemoryContext[];
+}) {
+    const sections: string[] = [
+        "You are Chaibook, an assistant that helps users learn from their workspace sources.",
+    ];
+
+    if (input.userMemories && input.userMemories.length > 0) {
+        const memoryBlock = input.userMemories
+            .map((memory) => `- ${memory}`)
+            .join("\n");
+
+        sections.push(
+            "Known facts about this user (use when relevant):",
+            memoryBlock,
+        );
+    }
+
+    if (input.conversationSummary?.trim()) {
+        sections.push(
+            "Earlier conversation summary:",
+            input.conversationSummary.trim(),
+        );
+    }
+
+    if (input.chunks.length === 0) {
+        sections.push(
             "This workspace has no indexed source content yet, or nothing relevant was retrieved.",
             "Answer helpfully from general knowledge and suggest adding or processing sources when appropriate.",
             "Do not invent citations.",
-        ].join("\n");
+        );
+        return sections.join("\n");
     }
 
-    const context = chunks
+    const context = input.chunks
         .map((chunk, index) => {
             const label = `[${index + 1}] ${chunk.sourceTitle} (${chunk.sourceType})${
                 chunk.page ? `, page ${chunk.page}` : ""
@@ -130,8 +162,7 @@ export function buildRagSystemPrompt(chunks: RetrievedChunk[]) {
         })
         .join("\n\n");
 
-    return [
-        "You are Chaibook, an assistant that answers questions using the user's workspace sources.",
+    sections.push(
         "Use ONLY the retrieved context below when making factual claims about their materials.",
         "If the context is insufficient, say so clearly.",
         "Cite sources inline using [1], [2], etc. matching the numbered context blocks.",
@@ -139,5 +170,7 @@ export function buildRagSystemPrompt(chunks: RetrievedChunk[]) {
         "",
         "Retrieved context:",
         context,
-    ].join("\n");
+    );
+
+    return sections.join("\n");
 }

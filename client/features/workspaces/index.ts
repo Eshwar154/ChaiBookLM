@@ -12,7 +12,6 @@ export {
     updateWorkspace,
 } from "./lib/api";
 
-export { getWorkspaceOrNull } from "./lib/workspace-server";
 export { isWorkspaceRoute, workspaceRoutes } from "./lib/routes";
 
 export {

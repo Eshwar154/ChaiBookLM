@@ -83,6 +83,7 @@ model Workspace {
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   sources       Source[]
   conversations Conversation[]
+  artifacts     LearningArtifact[]
 
   @@index([userId])
   @@map("workspace")
@@ -144,13 +145,16 @@ enum MessageRole {
 }
 
 model Conversation {
-  id          String    @id @default(cuid())
-  workspaceId String
-  title       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  messages    Message[]
+  id                   String    @id @default(cuid())
+  workspaceId          String
+  title                String?
+  summary              String?
+  summaryMessageCount  Int       @default(0)
+  summarizedAt         DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  messages             Message[]
 
   @@index([workspaceId])
   @@index([workspaceId, updatedAt])
@@ -169,4 +173,39 @@ model Message {
   @@index([conversationId])
   @@index([conversationId, createdAt])
   @@map("message")
+}
+
+enum ArtifactType {
+  SUMMARY
+  TAKEAWAYS
+  FLASHCARDS
+  QUIZ
+  MINDMAP
+  REPORT
+}
+
+enum ArtifactStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+model LearningArtifact {
+  id          String         @id @default(cuid())
+  workspaceId String
+  type        ArtifactType
+  title       String
+  content     Json?
+  sourceIds   String[]
+  status      ArtifactStatus @default(PENDING)
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([workspaceId, type])
+  @@index([workspaceId, status])
+  @@map("learning_artifact")
 }

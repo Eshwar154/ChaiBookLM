@@ -6,9 +6,11 @@ import { usePathname } from "next/navigation";
 import {
     ArrowLeftIcon,
     BookOpenIcon,
+    GraduationCapIcon,
     MessageSquareIcon,
     PlusIcon,
 } from "lucide-react";
+import { learnRoutes } from "@/features/learn";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import {
     AddSourceDialog,
@@ -45,8 +47,11 @@ export function WorkspaceShell({ workspace, children }: WorkspaceShellProps) {
     const [addSourceOpen, setAddSourceOpen] = useState(false);
 
     const sourcesPath = sourceRoutes.list(workspace.id);
+    const learnPath = learnRoutes.hub(workspace.id);
     const isSourcesActive = pathname.startsWith(sourcesPath);
-    const isChatActive = !isSourcesActive;
+    const isLearnActive = pathname.startsWith(learnPath);
+    const isChatActive =
+        !isSourcesActive && !isLearnActive;
 
     return (
         <SidebarProvider>
@@ -85,6 +90,17 @@ export function WorkspaceShell({ workspace, children }: WorkspaceShellProps) {
                                     >
                                         <MessageSquareIcon />
                                         <span>Chat</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton
+                                        isActive={isLearnActive}
+                                        render={
+                                            <Link href={learnPath} />
+                                        }
+                                    >
+                                        <GraduationCapIcon />
+                                        <span>Learn</span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
@@ -142,7 +158,7 @@ export function WorkspaceShell({ workspace, children }: WorkspaceShellProps) {
                     <SignOutButton />
                 </header>
 
-                <main className="flex flex-1 flex-col">{children}</main>
+                <main className="flex min-h-0 flex-1 flex-col">{children}</main>
             </SidebarInset>
 
             <AddSourceDialog

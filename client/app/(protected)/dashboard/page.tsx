@@ -1,5 +1,9 @@
 import { requireAuth, SignOutButton } from "@/features/auth";
+import { memoryRoutes } from "@/features/memory";
 import { WorkspaceList } from "@/features/workspaces";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { BrainIcon } from "lucide-react";
 
 export default async function DashboardPage() {
     await requireAuth();
@@ -15,7 +19,18 @@ export default async function DashboardPage() {
                         Manage your Chaibook workspaces.
                     </p>
                 </div>
-                <SignOutButton />
+                <div className="flex items-center gap-2">
+                    <Button
+                        nativeButton={false}
+                        variant="outline"
+                        size="sm"
+                        render={<Link href={memoryRoutes.settings} />}
+                    >
+                        <BrainIcon />
+                        Memory
+                    </Button>
+                    <SignOutButton />
+                </div>
             </div>
 
             <WorkspaceList />
