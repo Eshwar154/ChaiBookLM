@@ -79,16 +79,21 @@ export function CitationSources({
             <AttachmentGroup className="px-0.5">
                 {unique.map((citation) => {
                     const description = [
-                        sourceTypeLabel(citation.sourceType),
+                        citation.sourceType === "WEB"
+                            ? "Web"
+                            : sourceTypeLabel(citation.sourceType),
                         citation.page ? `p.${citation.page}` : null,
                     ]
                         .filter(Boolean)
                         .join(" · ");
+                    const citationKey =
+                        citation.sourceId ??
+                        citation.url ??
+                        citation.sourceTitle;
+                    const isWeb = citation.sourceType === "WEB" && citation.url;
 
                     return (
-                        <HoverCard
-                            key={`${citation.sourceId}-${citation.chunkIndex}`}
-                        >
+                        <HoverCard key={citationKey}>
                             <HoverCardTrigger
                                 delay={150}
                                 closeDelay={100}
@@ -100,7 +105,11 @@ export function CitationSources({
                                 >
                                     <AttachmentMedia variant="icon">
                                         <SourceTypeIcon
-                                            type={citation.sourceType}
+                                            type={
+                                                citation.sourceType === "WEB"
+                                                    ? "WEBSITE"
+                                                    : citation.sourceType
+                                            }
                                         />
                                     </AttachmentMedia>
                                     <AttachmentContent>
@@ -113,16 +122,28 @@ export function CitationSources({
                                             </AttachmentDescription>
                                         ) : null}
                                     </AttachmentContent>
-                                    <AttachmentTrigger
-                                        render={
-                                            <Link
-                                                href={sourceRoutes.detail(
-                                                    workspaceId,
-                                                    citation.sourceId,
-                                                )}
-                                            />
-                                        }
-                                    />
+                                    {isWeb ? (
+                                        <AttachmentTrigger
+                                            render={
+                                                <a
+                                                    href={citation.url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                />
+                                            }
+                                        />
+                                    ) : citation.sourceId ? (
+                                        <AttachmentTrigger
+                                            render={
+                                                <Link
+                                                    href={sourceRoutes.detail(
+                                                        workspaceId,
+                                                        citation.sourceId,
+                                                    )}
+                                                />
+                                            }
+                                        />
+                                    ) : null}
                                 </Attachment>
                             </HoverCardTrigger>
                             <HoverCardContent

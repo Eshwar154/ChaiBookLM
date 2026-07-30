@@ -57,7 +57,24 @@ export const importYoutubeSchema = z.object({
     title: z.string().trim().max(200).optional(),
 });
 
+export const bulkDeleteSourcesSchema = z.object({
+    sourceIds: z.array(z.string().trim().min(1)).min(1),
+});
+
+export const reprocessSourcesSchema = z.object({
+    sourceIds: z.array(z.string().trim().min(1)).optional(),
+});
+
+export const importWebSearchSchema = z.object({
+    title: z.string().trim().min(1).max(200),
+    content: z.string().trim().min(1),
+    url: z.string().trim().url(),
+});
+
 export type CreateSourceInput = z.infer<typeof createSourceSchema>;
 export type ListSourcesQuery = z.infer<typeof listSourcesQuerySchema>;
 export type ImportWebsiteInput = z.infer<typeof importWebsiteSchema>;
 export type ImportYoutubeInput = z.infer<typeof importYoutubeSchema>;
+export type BulkDeleteSourcesInput = z.infer<typeof bulkDeleteSourcesSchema>;
+export type ReprocessSourcesInput = z.infer<typeof reprocessSourcesSchema>;
+export type ImportWebSearchInput = z.infer<typeof importWebSearchSchema>;

@@ -8,6 +8,7 @@ import {
     deleteSourceRecord,
     findSourceByIdAndWorkspaceId,
     findSourcesByWorkspaceId,
+    updateSourceRecord,
     type SourceRecord,
 } from "../repositories/source.repository.js";
 import { getWorkspaceByIdForUser } from "./workspace.service.js";
@@ -15,8 +16,10 @@ import { NotFoundError } from "../types/app-error.js";
 import type {
     CreateSourceInput,
     ImportWebsiteInput,
+    ImportWebSearchInput,
     ImportYoutubeInput,
     ListSourcesQuery,
+    ReprocessSourcesInput,
 } from "../validators/source.validator.js";
 import { listChunksForSource, removeSourceFromIndex } from "./source-processing.service.js";
 
@@ -180,4 +183,83 @@ export async function getSourceChunksForWorkspace(
 ) {
     await getSourceForWorkspace(workspaceId, sourceId, userId);
     return listChunksForSource(sourceId);
+}
+
+export async function bulkDeleteSourcesForWorkspace(
+    workspaceId: string,
+    userId: string,
+    sourceIds: string[],
+) {
+    await assertWorkspaceAccess(workspaceId, userId);
+
+    for (const sourceId of sourceIds) {
+        await deleteSourceForWorkspace(workspaceId, sourceId, userId);
+    }
+}
+
+export async function reprocessSourcesForWorkspace(
+    workspaceId: string,
+    userId: string,
+    input: ReprocessSourcesInput = {},
+) {
+    await assertWorkspaceAccess(workspaceId, userId);
+
+    const sources = await findSourcesByWorkspaceId(workspaceId, {
+        status: "FAILED",
+    });
+
+    const targets = input.sourceIds?.length
+        ? sources.filter((source) => input.sourceIds!.includes(source.id))
+        : sources;
+
+    for (const source of targets) {
+        await reprocessSourceForWorkspace(workspaceId, source.id, userId);
+    }
+
+    return { reprocessed: targets.length };
+}
+
+export async function reprocessSourceForWorkspace(
+    workspaceId: string,
+    sourceId: string,
+    userId: string,
+) {
+    const source = await getSourceForWorkspace(workspaceId, sourceId, userId);
+
+    await removeSourceFromIndex(workspaceId, sourceId);
+
+    const metadata =
+        source.metadata && typeof source.metadata === "object"
+            ? { ...(source.metadata as Record<string, unknown>) }
+            : {};
+
+    delete metadata.processingError;
+
+    await updateSourceRecord(sourceId, {
+        status: "PENDING",
+        metadata: metadata as Parameters<typeof updateSourceRecord>[1]["metadata"],
+    });
+
+    await enqueueSourceProcessing({ sourceId, workspaceId });
+}
+
+export async function importWebSearchSource(
+    workspaceId: string,
+    userId: string,
+    input: ImportWebSearchInput,
+) {
+    await assertWorkspaceAccess(workspaceId, userId);
+
+    return createAndProcessSource({
+        workspaceId,
+        type: "WEBSITE",
+        title: input.title,
+        content: input.content,
+        url: input.url,
+        status: "PENDING",
+        metadata: {
+            importedFrom: "web-search",
+            sourceUrl: input.url,
+        },
+    });
 }

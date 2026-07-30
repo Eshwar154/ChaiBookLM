@@ -115,5 +115,7 @@ export async function streamChat(req: Request, res: Response) {
     await streamWorkspaceChat(res, workspaceId, req.session.user.id, {
         conversationId: body.conversationId,
         messages: body.messages as unknown as UIMessage[],
+        model: body.model,
+        webSearch: body.webSearch,
     });
 }

@@ -1,12 +1,13 @@
 export type ChatCitation = {
-    sourceId: string;
+    sourceId?: string;
     sourceTitle: string;
     sourceType: string;
-    chunkId: string;
-    chunkIndex: number;
+    chunkId?: string;
+    chunkIndex?: number;
     page?: number;
     excerpt: string;
-    score: number;
+    score?: number;
+    url?: string;
 };
 
 export type Conversation = {

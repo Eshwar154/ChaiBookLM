@@ -1,17 +1,20 @@
 import { openai } from "@ai-sdk/openai";
 import type { Response } from "express";
+import { z } from "zod";
 import {
     convertToModelMessages,
     createUIMessageStream,
+    isStepCount,
     pipeUIMessageStreamToResponse,
     streamText,
     toUIMessageStream,
+    tool,
     type UIMessage,
 } from "ai";
 import {
-    CHAT_MODEL,
     CONVERSATION_SUMMARY_INTERVAL,
     RECENT_MESSAGE_WINDOW,
+    resolveChatModel,
 } from "../lib/ai-config.js";
 import { enqueueConversationSummarize } from "../lib/conversation-events.js";
 import {
@@ -33,6 +36,12 @@ import {
     findMessagesByConversationId,
 } from "../repositories/message.repository.js";
 import { addMemoriesFromMessages, searchUserMemories } from "../lib/mem0.js";
+import {
+    formatTavilyResultsForPrompt,
+    isTavilyConfigured,
+    searchWeb,
+    type TavilySearchResponse,
+} from "../lib/tavily.js";
 import { NotFoundError, ValidationError } from "../types/app-error.js";
 import {
     buildConversationTitle,
@@ -40,6 +49,22 @@ import {
     getTextFromUIMessage,
 } from "../utils/chat-message.js";
 import { getWorkspaceByIdForUser } from "./workspace.service.js";
+
+type WebCitation = {
+    sourceType: "WEB";
+    sourceTitle: string;
+    url: string;
+    excerpt: string;
+};
+
+function toWebCitations(response: TavilySearchResponse): WebCitation[] {
+    return response.results.map((result) => ({
+        sourceType: "WEB" as const,
+        sourceTitle: result.title,
+        url: result.url,
+        excerpt: result.content.slice(0, 280),
+    }));
+}
 
 async function assertWorkspaceAccess(workspaceId: string, userId: string) {
     await getWorkspaceByIdForUser(workspaceId, userId);
@@ -157,9 +182,13 @@ export async function streamWorkspaceChat(
     input: {
         conversationId?: string;
         messages: UIMessage[];
+        model?: string;
+        webSearch?: boolean;
     },
 ) {
-    await assertWorkspaceAccess(workspaceId, userId);
+    const workspace = await getWorkspaceByIdForUser(workspaceId, userId);
+    const chatModel = resolveChatModel(input.model ?? workspace.defaultModel);
+    const webSearchEnabled = Boolean(input.webSearch) && isTavilyConfigured();
 
     const userText = getLastUserMessageText(input.messages);
     if (!userText) {
@@ -188,6 +217,7 @@ export async function streamWorkspaceChat(
         chunks: retrievedChunks,
         conversationSummary: conversation.summary,
         userMemories: userMemories.map((memory) => memory.memory),
+        webSearchEnabled,
     });
 
     const contextMessages = trimMessagesForContext(
@@ -195,13 +225,39 @@ export async function streamWorkspaceChat(
         Boolean(conversation.summary),
     );
 
+    let webSearchResults: TavilySearchResponse | null = null;
+
     const stream = createUIMessageStream({
         originalMessages: input.messages,
         execute: async ({ writer }) => {
+            const tools =
+                webSearchEnabled
+                    ? {
+                          web_search: tool({
+                              description:
+                                  "Search the web for up-to-date information outside the workspace sources.",
+                              inputSchema: z.object({
+                                  query: z
+                                      .string()
+                                      .describe(
+                                          "The search query for current web information",
+                                      ),
+                              }),
+                              execute: async ({ query }) => {
+                                  const results = await searchWeb(query);
+                                  webSearchResults = results;
+                                  return formatTavilyResultsForPrompt(results);
+                              },
+                          }),
+                      }
+                    : undefined;
+
             const result = streamText({
-                model: openai(CHAT_MODEL),
+                model: openai(chatModel),
                 system: systemPrompt,
                 messages: await convertToModelMessages(contextMessages),
+                tools,
+                stopWhen: webSearchEnabled ? isStepCount(3) : undefined,
             });
 
             writer.merge(toUIMessageStream({ stream: result.stream }));
@@ -216,11 +272,19 @@ export async function streamWorkspaceChat(
                 return;
             }
 
+            const webCitations = webSearchResults
+                ? toWebCitations(webSearchResults)
+                : [];
+            const allCitations =
+                webCitations.length > 0
+                    ? [...citations, ...webCitations]
+                    : citations;
+
             await createMessageRecord({
                 conversationId: conversation.id,
                 role: "ASSISTANT",
                 content: assistantText,
-                citations,
+                citations: allCitations.length > 0 ? allCitations : citations,
             });
 
             await touchConversation(conversation.id);

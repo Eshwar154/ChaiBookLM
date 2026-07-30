@@ -5,7 +5,13 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BotIcon, MessageSquarePlusIcon, Trash2Icon } from "lucide-react";
+import {
+    BotIcon,
+    DownloadIcon,
+    GlobeIcon,
+    MessageSquarePlusIcon,
+    Trash2Icon,
+} from "lucide-react";
 import {
     Message,
     MessageAvatar,
@@ -44,9 +50,15 @@ import { CitationSources } from "./citation-sources";
 import { ChatComposer } from "./chat-composer";
 import type { ChatCitation } from "../lib/types";
 import { workspaceRoutes } from "@/features/workspaces/lib/routes";
+import { useChatPreferences } from "../stores/chat-preferences";
+import {
+    downloadMarkdown,
+    exportConversationMarkdown,
+} from "../lib/export-chat";
 
 type WorkspaceChatProps = {
     workspaceId: string;
+    defaultModel?: string;
 };
 
 function getMessageText(message: UIMessage) {
@@ -56,7 +68,10 @@ function getMessageText(message: UIMessage) {
         .join("");
 }
 
-export function WorkspaceChat({ workspaceId }: WorkspaceChatProps) {
+export function WorkspaceChat({
+    workspaceId,
+    defaultModel,
+}: WorkspaceChatProps) {
     const queryClient = useQueryClient();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -67,12 +82,20 @@ export function WorkspaceChat({ workspaceId }: WorkspaceChatProps) {
         Record<string, ChatCitation[]>
     >({});
 
+    const getPrefs = useChatPreferences((state) => state.getPrefs);
+    const setWebSearch = useChatPreferences((state) => state.setWebSearch);
+    const chatPrefs = getPrefs(workspaceId, defaultModel);
+
     const { data: conversations = [], isLoading: conversationsLoading } =
         useConversations(workspaceId);
     const { data: storedMessages, isLoading: messagesLoading } =
         useConversationMessages(workspaceId, conversationId);
     const createConversation = useCreateConversation(workspaceId);
     const deleteConversation = useDeleteConversation(workspaceId);
+
+    const activeConversation = conversations.find(
+        (conversation) => conversation.id === conversationId,
+    );
 
     const handleConversationId = useCallback(
         (id: string) => {
@@ -89,7 +112,11 @@ export function WorkspaceChat({ workspaceId }: WorkspaceChatProps) {
             new DefaultChatTransport({
                 api: `/api/workspaces/${workspaceId}/chat`,
                 credentials: "include",
-                body: conversationId ? { conversationId } : undefined,
+                body: {
+                    ...(conversationId ? { conversationId } : {}),
+                    model: chatPrefs.model,
+                    webSearch: chatPrefs.webSearch,
+                },
                 fetch: async (url, init) => {
                     const response = await fetch(url, {
                         ...init,
@@ -105,7 +132,13 @@ export function WorkspaceChat({ workspaceId }: WorkspaceChatProps) {
                     return response;
                 },
             }),
-        [workspaceId, conversationId, handleConversationId],
+        [
+            workspaceId,
+            conversationId,
+            handleConversationId,
+            chatPrefs.model,
+            chatPrefs.webSearch,
+        ],
     );
 
     const { messages, sendMessage, setMessages, status, error } = useChat({
@@ -192,6 +225,22 @@ export function WorkspaceChat({ workspaceId }: WorkspaceChatProps) {
         await handleNewChat();
     }
 
+    function handleExportChat() {
+        if (messages.length === 0) {
+            return;
+        }
+
+        const markdown = exportConversationMarkdown({
+            conversation: activeConversation ?? null,
+            messages,
+            citationsByMessageId,
+        });
+        const slug =
+            activeConversation?.title?.replace(/[^\w-]+/g, "-").toLowerCase() ??
+            "chat";
+        downloadMarkdown(markdown, `${slug}-${Date.now()}.md`);
+    }
+
     return (
         <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-center gap-2 border-b px-4 py-3">
@@ -228,6 +277,16 @@ export function WorkspaceChat({ workspaceId }: WorkspaceChatProps) {
                 >
                     <MessageSquarePlusIcon />
                     New
+                </Button>
+
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={messages.length === 0}
+                    onClick={handleExportChat}
+                >
+                    <DownloadIcon />
+                    Export
                 </Button>
 
                 {conversationId ? (
@@ -367,6 +426,10 @@ export function WorkspaceChat({ workspaceId }: WorkspaceChatProps) {
             <ChatComposer
                 disabled={createConversation.isPending}
                 isStreaming={isStreaming}
+                webSearchEnabled={chatPrefs.webSearch}
+                onWebSearchChange={(enabled) =>
+                    setWebSearch(workspaceId, enabled)
+                }
                 onSubmit={(text) => {
                     void sendMessage({ text });
                 }}

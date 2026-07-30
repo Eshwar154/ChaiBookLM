@@ -15,7 +15,9 @@ type ChatMessageBodyProps = {
 };
 
 function injectCitationTags(text: string) {
-    return text.replace(/\[(\d+)\]/g, '<cite index="$1">$1</cite>');
+    return text
+        .replace(/\[W(\d+)\]/g, '<cite web="$1">W$1</cite>')
+        .replace(/\[(\d+)\]/g, '<cite index="$1">$1</cite>');
 }
 
 export function ChatMessageBody({
@@ -31,11 +33,38 @@ export function ChatMessageBody({
         () => ({
             cite: ({
                 index,
+                web,
                 children,
             }: {
                 index?: string;
+                web?: string;
                 children?: React.ReactNode;
             }) => {
+                if (web) {
+                    const webIndex = Number(web ?? children);
+                    const webCitations = citations.filter(
+                        (citation) => citation.sourceType === "WEB",
+                    );
+                    const citation = webCitations[webIndex - 1];
+
+                    if (!citation) {
+                        return (
+                            <span className="font-medium text-primary">
+                                [W{webIndex}]
+                            </span>
+                        );
+                    }
+
+                    return (
+                        <CitationMarker
+                            index={webIndex}
+                            citation={citation}
+                            workspaceId={workspaceId}
+                            prefix="W"
+                        />
+                    );
+                }
+
                 const citationIndex = Number(index ?? children);
                 const citation = getCitationByIndex(citations, citationIndex);
 
@@ -64,7 +93,7 @@ export function ChatMessageBody({
             mode={isAnimating ? "streaming" : "static"}
             isAnimating={isAnimating}
             plugins={plugins}
-            allowedTags={{ cite: ["index"] }}
+            allowedTags={{ cite: ["index", "web"] }}
             literalTagContent={["cite"]}
             components={components}
             className="min-w-0 text-sm leading-relaxed"

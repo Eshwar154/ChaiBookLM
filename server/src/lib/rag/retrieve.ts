@@ -121,10 +121,19 @@ export function buildChatSystemPrompt(input: {
     chunks: RetrievedChunk[];
     conversationSummary?: string | null;
     userMemories?: UserMemoryContext[];
+    webSearchEnabled?: boolean;
 }) {
     const sections: string[] = [
         "You are Chaibook, an assistant that helps users learn from their workspace sources.",
     ];
+
+    if (input.webSearchEnabled) {
+        sections.push(
+            "You have access to a web_search tool for up-to-date information outside the workspace.",
+            "Use it when the user asks about recent events or topics not covered by their sources.",
+            "Cite web results inline using [W1], [W2], etc. matching the web result blocks.",
+        );
+    }
 
     if (input.userMemories && input.userMemories.length > 0) {
         const memoryBlock = input.userMemories
@@ -147,7 +156,9 @@ export function buildChatSystemPrompt(input: {
     if (input.chunks.length === 0) {
         sections.push(
             "This workspace has no indexed source content yet, or nothing relevant was retrieved.",
-            "Answer helpfully from general knowledge and suggest adding or processing sources when appropriate.",
+            input.webSearchEnabled
+                ? "Use web search when needed, or answer from general knowledge."
+                : "Answer helpfully from general knowledge and suggest adding or processing sources when appropriate.",
             "Do not invent citations.",
         );
         return sections.join("\n");

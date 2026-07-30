@@ -9,6 +9,7 @@ import {
     GraduationCapIcon,
     MessageSquareIcon,
     PlusIcon,
+    SettingsIcon,
 } from "lucide-react";
 import { learnRoutes } from "@/features/learn";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
@@ -36,6 +37,7 @@ import {
 } from "@/components/ui/sidebar";
 import { workspaceRoutes } from "../lib/routes";
 import type { Workspace } from "../lib/types";
+import { WorkspaceHeaderActions } from "./workspace-header-actions";
 
 type WorkspaceShellProps = {
     workspace: Workspace;
@@ -51,7 +53,8 @@ export function WorkspaceShell({ workspace, children }: WorkspaceShellProps) {
     const isSourcesActive = pathname.startsWith(sourcesPath);
     const isLearnActive = pathname.startsWith(learnPath);
     const isChatActive =
-        !isSourcesActive && !isLearnActive;
+        !isSourcesActive && !isLearnActive && !pathname.includes("/settings");
+    const isSettingsActive = pathname.includes("/settings");
 
     return (
         <SidebarProvider>
@@ -114,6 +117,21 @@ export function WorkspaceShell({ workspace, children }: WorkspaceShellProps) {
                                         <span>Sources</span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton
+                                        isActive={isSettingsActive}
+                                        render={
+                                            <Link
+                                                href={workspaceRoutes.settings(
+                                                    workspace.id,
+                                                )}
+                                            />
+                                        }
+                                    >
+                                        <SettingsIcon />
+                                        <span>Settings</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
                             </SidebarMenu>
                         </SidebarGroupContent>
                     </SidebarGroup>
@@ -155,6 +173,7 @@ export function WorkspaceShell({ workspace, children }: WorkspaceShellProps) {
                         <PlusIcon />
                         Add source
                     </Button>
+                    <WorkspaceHeaderActions workspace={workspace} />
                     <SignOutButton />
                 </header>
 

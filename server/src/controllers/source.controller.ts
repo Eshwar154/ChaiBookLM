@@ -1,21 +1,28 @@
 import type { Request, Response } from "express";
 import {
     createTextOrMarkdownSource,
+    bulkDeleteSourcesForWorkspace,
     deleteSourceForWorkspace,
     getSourceChunksForWorkspace,
     getSourceForWorkspace,
+    importWebSearchSource,
     importWebsiteSource,
     importYoutubeSource,
     listSourcesForWorkspace,
+    reprocessSourceForWorkspace,
+    reprocessSourcesForWorkspace,
     uploadPdfSource,
 } from "../services/source.service.js";
 import { ValidationError } from "../types/app-error.js";
 import { getZodFieldErrors } from "../utils/zod-error.js";
 import {
+    bulkDeleteSourcesSchema,
     createSourceSchema,
+    importWebSearchSchema,
     importWebsiteSchema,
     importYoutubeSchema,
     listSourcesQuerySchema,
+    reprocessSourcesSchema,
     sourceIdParamSchema,
     workspaceIdParamSchema,
 } from "../validators/source.validator.js";
@@ -87,6 +94,45 @@ function parseImportWebsiteBody(body: unknown) {
 
 function parseImportYoutubeBody(body: unknown) {
     const parsed = importYoutubeSchema.safeParse(body);
+
+    if (!parsed.success) {
+        throw new ValidationError(
+            "Validation failed",
+            getZodFieldErrors(parsed.error),
+        );
+    }
+
+    return parsed.data;
+}
+
+function parseBulkDeleteBody(body: unknown) {
+    const parsed = bulkDeleteSourcesSchema.safeParse(body);
+
+    if (!parsed.success) {
+        throw new ValidationError(
+            "Validation failed",
+            getZodFieldErrors(parsed.error),
+        );
+    }
+
+    return parsed.data;
+}
+
+function parseReprocessBody(body: unknown) {
+    const parsed = reprocessSourcesSchema.safeParse(body ?? {});
+
+    if (!parsed.success) {
+        throw new ValidationError(
+            "Validation failed",
+            getZodFieldErrors(parsed.error),
+        );
+    }
+
+    return parsed.data;
+}
+
+function parseImportWebSearchBody(body: unknown) {
+    const parsed = importWebSearchSchema.safeParse(body);
 
     if (!parsed.success) {
         throw new ValidationError(
@@ -190,4 +236,47 @@ export async function deleteSource(req: Request, res: Response) {
         req.session.user.id,
     );
     res.status(204).send();
+}
+
+export async function bulkDeleteSources(req: Request, res: Response) {
+    const { workspaceId } = parseWorkspaceId(req.params);
+    const input = parseBulkDeleteBody(req.body);
+    await bulkDeleteSourcesForWorkspace(
+        workspaceId,
+        req.session.user.id,
+        input.sourceIds,
+    );
+    res.status(204).send();
+}
+
+export async function reprocessSources(req: Request, res: Response) {
+    const { workspaceId } = parseWorkspaceId(req.params);
+    const input = parseReprocessBody(req.body);
+    const result = await reprocessSourcesForWorkspace(
+        workspaceId,
+        req.session.user.id,
+        input,
+    );
+    res.json(result);
+}
+
+export async function reprocessSource(req: Request, res: Response) {
+    const { workspaceId, sourceId } = parseSourceParams(req.params);
+    await reprocessSourceForWorkspace(
+        workspaceId,
+        sourceId,
+        req.session.user.id,
+    );
+    res.status(202).json({ reprocessed: true });
+}
+
+export async function importWebSearch(req: Request, res: Response) {
+    const { workspaceId } = parseWorkspaceId(req.params);
+    const input = parseImportWebSearchBody(req.body);
+    const source = await importWebSearchSource(
+        workspaceId,
+        req.session.user.id,
+        input,
+    );
+    res.status(201).json(source);
 }

@@ -8,9 +8,13 @@ export function getCitationByIndex(
 }
 
 export function uniqueCitationsBySource(citations: ChatCitation[]) {
-    return citations.filter(
-        (citation, index, array) =>
-            array.findIndex((item) => item.sourceId === citation.sourceId) ===
-            index,
-    );
+    return citations.filter((citation, index, array) => {
+        const key = citation.sourceId ?? citation.url ?? citation.sourceTitle;
+        return (
+            array.findIndex(
+                (item) =>
+                    (item.sourceId ?? item.url ?? item.sourceTitle) === key,
+            ) === index
+        );
+    });
 }

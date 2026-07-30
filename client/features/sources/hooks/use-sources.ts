@@ -4,12 +4,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/shared/lib/api";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import {
+    bulkDeleteSources,
     createSource,
     deleteSource,
     getSource,
     importWebsiteSource,
+    importWebSearchSource,
     importYoutubeSource,
     listSources,
+    reprocessSource,
+    reprocessSources,
     uploadPdfSource,
 } from "../lib/api";
 import type {
@@ -139,6 +143,68 @@ export function useDeleteSource(workspaceId: string) {
             queryClient.removeQueries({
                 queryKey: sourceKeys(workspaceId).detail(sourceId),
             });
+            void queryClient.invalidateQueries({
+                queryKey: sourceKeys(workspaceId).all,
+            });
+        },
+    });
+}
+
+export function useBulkDeleteSources(workspaceId: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (sourceIds: string[]) =>
+            bulkDeleteSources(workspaceId, sourceIds),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({
+                queryKey: sourceKeys(workspaceId).all,
+            });
+        },
+    });
+}
+
+export function useReprocessSources(workspaceId: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (sourceIds?: string[]) =>
+            reprocessSources(workspaceId, sourceIds),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({
+                queryKey: sourceKeys(workspaceId).all,
+            });
+        },
+    });
+}
+
+export function useReprocessSource(workspaceId: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (sourceId: string) =>
+            reprocessSource(workspaceId, sourceId),
+        onSuccess: (_, sourceId) => {
+            void queryClient.invalidateQueries({
+                queryKey: sourceKeys(workspaceId).detail(sourceId),
+            });
+            void queryClient.invalidateQueries({
+                queryKey: sourceKeys(workspaceId).all,
+            });
+        },
+    });
+}
+
+export function useImportWebSearchSource(workspaceId: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (input: {
+            title: string;
+            content: string;
+            url: string;
+        }) => importWebSearchSource(workspaceId, input),
+        onSuccess: () => {
             void queryClient.invalidateQueries({
                 queryKey: sourceKeys(workspaceId).all,
             });

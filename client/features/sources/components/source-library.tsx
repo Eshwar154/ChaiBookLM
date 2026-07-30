@@ -5,7 +5,9 @@ import {
     LayoutGridIcon,
     ListIcon,
     PlusIcon,
+    RefreshCwIcon,
     SearchIcon,
+    Trash2Icon,
 } from "lucide-react";
 import {
     AlertDialog,
@@ -18,6 +20,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     Empty,
     EmptyContent,
@@ -30,7 +33,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/shared/lib/api";
-import { useDeleteSource, useSources } from "../hooks/use-sources";
+import {
+    useBulkDeleteSources,
+    useDeleteSource,
+    useReprocessSources,
+    useSources,
+} from "../hooks/use-sources";
 import {
     SOURCE_STATUSES,
     SOURCE_TYPE_LABELS,
@@ -49,9 +57,16 @@ export function SourceLibrary({ workspaceId }: SourceLibraryProps) {
     const [addOpen, setAddOpen] = useState(false);
     const [deletingSource, setDeletingSource] = useState<Source | null>(null);
     const [filters, setFilters] = useState<SourceFilters>({});
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [selectionMode, setSelectionMode] = useState(false);
 
     const { data: sources, isLoading, error } = useSources(workspaceId, filters);
     const deleteSource = useDeleteSource(workspaceId);
+    const bulkDelete = useBulkDeleteSources(workspaceId);
+    const reprocessFailed = useReprocessSources(workspaceId);
+
+    const failedCount =
+        sources?.filter((source) => source.status === "FAILED").length ?? 0;
 
     return (
         <div className="flex flex-1 flex-col gap-6 p-6">
@@ -69,6 +84,54 @@ export function SourceLibrary({ workspaceId }: SourceLibraryProps) {
                     Add source
                 </Button>
             </div>
+
+            {(selectionMode || failedCount > 0) && (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-muted/30 p-3">
+                    <Button
+                        size="sm"
+                        variant={selectionMode ? "secondary" : "outline"}
+                        onClick={() => {
+                            setSelectionMode((current) => !current);
+                            setSelectedIds([]);
+                        }}
+                    >
+                        {selectionMode ? "Cancel selection" : "Select sources"}
+                    </Button>
+
+                    {selectionMode && selectedIds.length > 0 ? (
+                        <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={bulkDelete.isPending}
+                            onClick={() => {
+                                void bulkDelete
+                                    .mutateAsync(selectedIds)
+                                    .then(() => {
+                                        setSelectedIds([]);
+                                        setSelectionMode(false);
+                                    });
+                            }}
+                        >
+                            <Trash2Icon />
+                            Delete selected ({selectedIds.length})
+                        </Button>
+                    ) : null}
+
+                    {failedCount > 0 ? (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={reprocessFailed.isPending}
+                            onClick={() =>
+                                void reprocessFailed.mutateAsync(undefined)
+                            }
+                        >
+                            <RefreshCwIcon />
+                            Reprocess failed ({failedCount})
+                        </Button>
+                    ) : null}
+                </div>
+            )}
 
             <div className="flex flex-col gap-4">
                 <div className="relative max-w-md">
@@ -200,11 +263,38 @@ export function SourceLibrary({ workspaceId }: SourceLibraryProps) {
                     )}
                 >
                     {sources.map((source) => (
-                        <SourceCard
-                            key={source.id}
-                            source={source}
-                            onDelete={setDeletingSource}
-                        />
+                        <div key={source.id} className="relative">
+                            {selectionMode ? (
+                                <div className="absolute top-4 left-4 z-10">
+                                    <Checkbox
+                                        checked={selectedIds.includes(source.id)}
+                                        onCheckedChange={(checked) => {
+                                            setSelectedIds((current) =>
+                                                checked
+                                                    ? [...current, source.id]
+                                                    : current.filter(
+                                                          (id) =>
+                                                              id !== source.id,
+                                                      ),
+                                            );
+                                        }}
+                                    />
+                                </div>
+                            ) : null}
+                            <SourceCard
+                                source={source}
+                                onDelete={setDeletingSource}
+                                onReprocess={
+                                    source.status === "FAILED"
+                                        ? (target) =>
+                                              void reprocessFailed.mutateAsync([
+                                                  target.id,
+                                              ])
+                                        : undefined
+                                }
+                                className={selectionMode ? "pl-10" : undefined}
+                            />
+                        </div>
                     ))}
                 </div>
             ) : (

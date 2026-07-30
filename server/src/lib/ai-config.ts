@@ -1,4 +1,14 @@
 export const CHAT_MODEL = "gpt-4o-mini";
+export const CHAT_MODELS = ["gpt-4o-mini", "gpt-4o"] as const;
+export type ChatModelId = (typeof CHAT_MODELS)[number];
+
+export function resolveChatModel(model?: string | null): ChatModelId {
+    if (model && CHAT_MODELS.includes(model as ChatModelId)) {
+        return model as ChatModelId;
+    }
+
+    return CHAT_MODEL;
+}
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMENSIONS = 1536;
 

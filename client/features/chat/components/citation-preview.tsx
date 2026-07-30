@@ -1,11 +1,16 @@
+"use client";
+
 import Link from "next/link";
 import {
     BookOpenIcon,
     ExternalLinkIcon,
     FileTextIcon,
     GlobeIcon,
+    PlusIcon,
     VideoIcon,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useImportWebSearchSource } from "@/features/sources/hooks/use-sources";
 import { SOURCE_TYPE_LABELS } from "@/features/sources/lib/constants";
 import type { SourceType } from "@/features/sources/lib/types";
 import { sourceRoutes } from "@/features/sources/lib/routes";
@@ -35,10 +40,12 @@ export function CitationPreview({
     workspaceId,
     markerIndex,
 }: CitationPreviewProps) {
+    const importWebSearch = useImportWebSearchSource(workspaceId);
     const sourceType =
         citation.sourceType in SOURCE_TYPE_LABELS
             ? SOURCE_TYPE_LABELS[citation.sourceType as SourceType]
             : citation.sourceType;
+    const isWeb = citation.sourceType === "WEB" && citation.url;
 
     return (
         <div className="space-y-3">
@@ -68,13 +75,44 @@ export function CitationPreview({
                 {citation.excerpt}
             </p>
 
-            <Link
-                href={sourceRoutes.detail(workspaceId, citation.sourceId)}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary underline-offset-4 hover:underline"
-            >
-                <ExternalLinkIcon className="size-3" />
-                Open source
-            </Link>
+            {isWeb ? (
+                <div className="flex flex-wrap gap-2">
+                    <a
+                        href={citation.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                        <ExternalLinkIcon className="size-3" />
+                        Open link
+                    </a>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={importWebSearch.isPending}
+                        onClick={() =>
+                            void importWebSearch.mutateAsync({
+                                title: citation.sourceTitle,
+                                content: citation.excerpt,
+                                url: citation.url!,
+                            })
+                        }
+                    >
+                        <PlusIcon className="size-3" />
+                        Save to library
+                    </Button>
+                </div>
+            ) : citation.sourceId ? (
+                <Link
+                    href={sourceRoutes.detail(workspaceId, citation.sourceId)}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-primary underline-offset-4 hover:underline"
+                >
+                    <ExternalLinkIcon className="size-3" />
+                    Open source
+                </Link>
+            ) : null}
         </div>
     );
 }
