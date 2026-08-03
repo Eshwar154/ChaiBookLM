@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
+    BookOpenIcon,
     LayoutGridIcon,
     ListIcon,
+    MoreHorizontalIcon,
     PlusIcon,
     RefreshCwIcon,
     SearchIcon,
     Trash2Icon,
+    XIcon,
 } from "lucide-react";
 import {
     AlertDialog,
@@ -22,6 +25,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
     Empty,
     EmptyContent,
     EmptyDescription,
@@ -29,6 +39,13 @@ import {
     EmptyTitle,
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
@@ -40,11 +57,12 @@ import {
     useSources,
 } from "../hooks/use-sources";
 import {
+    SOURCE_STATUS_LABELS,
     SOURCE_STATUSES,
     SOURCE_TYPE_LABELS,
     SOURCE_TYPES,
 } from "../lib/constants";
-import type { Source, SourceFilters } from "../lib/types";
+import type { Source, SourceFilters, SourceStatus, SourceType } from "../lib/types";
 import { AddSourceDialog } from "./add-source-dialog";
 import { SourceCard } from "./source-card";
 
@@ -68,161 +86,233 @@ export function SourceLibrary({ workspaceId }: SourceLibraryProps) {
     const failedCount =
         sources?.filter((source) => source.status === "FAILED").length ?? 0;
 
+    const activeFilterCount = useMemo(() => {
+        let count = 0;
+        if (filters.q?.trim()) count += 1;
+        if (filters.type) count += 1;
+        if (filters.status) count += 1;
+        return count;
+    }, [filters]);
+
+    const hasActiveFilters = activeFilterCount > 0;
+
+    function clearFilters() {
+        setFilters({});
+    }
+
+    function exitSelectionMode() {
+        setSelectionMode(false);
+        setSelectedIds([]);
+    }
+
     return (
-        <div className="flex flex-1 flex-col gap-6 p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h2 className="font-heading text-xl font-semibold">
+        <div className="flex flex-1 flex-col gap-6 p-6 md:p-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                    <h2 className="font-heading text-2xl font-semibold tracking-tight">
                         Source library
                     </h2>
                     <p className="text-sm text-muted-foreground">
-                        All knowledge sources in this workspace.
+                        {sources
+                            ? `${sources.length} source${sources.length === 1 ? "" : "s"} in this workspace`
+                            : "All knowledge sources in this workspace"}
                     </p>
                 </div>
-                <Button onClick={() => setAddOpen(true)}>
+                <Button onClick={() => setAddOpen(true)} className="shrink-0">
                     <PlusIcon />
                     Add source
                 </Button>
             </div>
 
-            {(selectionMode || failedCount > 0) && (
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-muted/30 p-3">
-                    <Button
-                        size="sm"
-                        variant={selectionMode ? "secondary" : "outline"}
-                        onClick={() => {
-                            setSelectionMode((current) => !current);
-                            setSelectedIds([]);
-                        }}
-                    >
-                        {selectionMode ? "Cancel selection" : "Select sources"}
-                    </Button>
-
-                    {selectionMode && selectedIds.length > 0 ? (
-                        <Button
-                            size="sm"
-                            variant="destructive"
-                            disabled={bulkDelete.isPending}
-                            onClick={() => {
-                                void bulkDelete
-                                    .mutateAsync(selectedIds)
-                                    .then(() => {
-                                        setSelectedIds([]);
-                                        setSelectionMode(false);
-                                    });
-                            }}
-                        >
-                            <Trash2Icon />
-                            Delete selected ({selectedIds.length})
-                        </Button>
-                    ) : null}
-
-                    {failedCount > 0 ? (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={reprocessFailed.isPending}
-                            onClick={() =>
-                                void reprocessFailed.mutateAsync(undefined)
+            <div className="space-y-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                    <div className="relative min-w-0 flex-1">
+                        <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            className="rounded-full bg-background pl-9"
+                            placeholder="Search sources..."
+                            value={filters.q ?? ""}
+                            onChange={(event) =>
+                                setFilters((current) => ({
+                                    ...current,
+                                    q: event.target.value,
+                                }))
                             }
-                        >
-                            <RefreshCwIcon />
-                            Reprocess failed ({failedCount})
-                        </Button>
-                    ) : null}
-                </div>
-            )}
+                        />
+                    </div>
 
-            <div className="flex flex-col gap-4">
-                <div className="relative max-w-md">
-                    <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        className="pl-9"
-                        placeholder="Search sources..."
-                        value={filters.q ?? ""}
-                        onChange={(event) =>
-                            setFilters((current) => ({
-                                ...current,
-                                q: event.target.value,
-                            }))
-                        }
-                    />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                    <FilterChip
-                        label="All types"
-                        active={!filters.type}
-                        onClick={() =>
-                            setFilters((current) => ({
-                                ...current,
-                                type: undefined,
-                            }))
-                        }
-                    />
-                    {SOURCE_TYPES.map((type) => (
-                        <FilterChip
-                            key={type}
-                            label={SOURCE_TYPE_LABELS[type]}
-                            active={filters.type === type}
-                            onClick={() =>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Select
+                            value={filters.type ?? "all"}
+                            onValueChange={(value) =>
                                 setFilters((current) => ({
                                     ...current,
                                     type:
-                                        current.type === type
+                                        value === "all"
                                             ? undefined
-                                            : type,
+                                            : (value as SourceType),
                                 }))
                             }
-                        />
-                    ))}
-                </div>
+                        >
+                            <SelectTrigger className="w-[130px] rounded-full">
+                                <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All types</SelectItem>
+                                {SOURCE_TYPES.map((type) => (
+                                    <SelectItem key={type} value={type}>
+                                        {SOURCE_TYPE_LABELS[type]}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
 
-                <div className="flex flex-wrap items-center gap-2">
-                    <FilterChip
-                        label="All statuses"
-                        active={!filters.status}
-                        onClick={() =>
-                            setFilters((current) => ({
-                                ...current,
-                                status: undefined,
-                            }))
-                        }
-                    />
-                    {SOURCE_STATUSES.map((status) => (
-                        <FilterChip
-                            key={status}
-                            label={status.toLowerCase()}
-                            active={filters.status === status}
-                            onClick={() =>
+                        <Select
+                            value={filters.status ?? "all"}
+                            onValueChange={(value) =>
                                 setFilters((current) => ({
                                     ...current,
                                     status:
-                                        current.status === status
+                                        value === "all"
                                             ? undefined
-                                            : status,
+                                            : (value as SourceStatus),
                                 }))
                             }
-                        />
-                    ))}
+                        >
+                            <SelectTrigger className="w-[130px] rounded-full">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All statuses</SelectItem>
+                                {SOURCE_STATUSES.map((status) => (
+                                    <SelectItem key={status} value={status}>
+                                        {SOURCE_STATUS_LABELS[status]}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
 
-                    <div className="ml-auto flex items-center gap-1">
-                        <Button
-                            variant={view === "grid" ? "secondary" : "ghost"}
-                            size="icon-sm"
-                            onClick={() => setView("grid")}
-                        >
-                            <LayoutGridIcon />
-                        </Button>
-                        <Button
-                            variant={view === "list" ? "secondary" : "ghost"}
-                            size="icon-sm"
-                            onClick={() => setView("list")}
-                        >
-                            <ListIcon />
-                        </Button>
+                        <div className="flex items-center rounded-full border bg-background p-0.5">
+                            <Button
+                                variant={view === "grid" ? "secondary" : "ghost"}
+                                size="icon-sm"
+                                className="rounded-full"
+                                onClick={() => setView("grid")}
+                            >
+                                <LayoutGridIcon />
+                                <span className="sr-only">Grid view</span>
+                            </Button>
+                            <Button
+                                variant={view === "list" ? "secondary" : "ghost"}
+                                size="icon-sm"
+                                className="rounded-full"
+                                onClick={() => setView("list")}
+                            >
+                                <ListIcon />
+                                <span className="sr-only">List view</span>
+                            </Button>
+                        </div>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger
+                                render={
+                                    <Button
+                                        variant="outline"
+                                        size="icon-sm"
+                                        className="rounded-full"
+                                    />
+                                }
+                            >
+                                <MoreHorizontalIcon />
+                                <span className="sr-only">More actions</span>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        if (selectionMode) {
+                                            exitSelectionMode();
+                                            return;
+                                        }
+                                        setSelectionMode(true);
+                                    }}
+                                >
+                                    {selectionMode
+                                        ? "Cancel selection"
+                                        : "Select sources"}
+                                </DropdownMenuItem>
+                                {failedCount > 0 ? (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                            disabled={reprocessFailed.isPending}
+                                            onClick={() =>
+                                                void reprocessFailed.mutateAsync(
+                                                    undefined,
+                                                )
+                                            }
+                                        >
+                                            <RefreshCwIcon />
+                                            Reprocess failed ({failedCount})
+                                        </DropdownMenuItem>
+                                    </>
+                                ) : null}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 </div>
+
+                {hasActiveFilters ? (
+                    <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">
+                            {activeFilterCount} filter
+                            {activeFilterCount === 1 ? "" : "s"} applied
+                        </span>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-muted-foreground"
+                            onClick={clearFilters}
+                        >
+                            <XIcon />
+                            Clear
+                        </Button>
+                    </div>
+                ) : null}
+
+                {selectionMode ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-muted/30 px-4 py-3">
+                        <p className="text-sm text-muted-foreground">
+                            {selectedIds.length > 0
+                                ? `${selectedIds.length} selected`
+                                : "Select sources to bulk delete"}
+                        </p>
+                        <div className="flex items-center gap-2">
+                            {selectedIds.length > 0 ? (
+                                <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={bulkDelete.isPending}
+                                    onClick={() => {
+                                        void bulkDelete
+                                            .mutateAsync(selectedIds)
+                                            .then(exitSelectionMode);
+                                    }}
+                                >
+                                    <Trash2Icon />
+                                    Delete selected
+                                </Button>
+                            ) : null}
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={exitSelectionMode}
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
             </div>
 
             {isLoading ? (
@@ -236,14 +326,14 @@ export function SourceLibrary({ workspaceId }: SourceLibraryProps) {
                         <Skeleton
                             key={index}
                             className={cn(
-                                "rounded-[24px]",
+                                "rounded-3xl",
                                 view === "grid" ? "h-40" : "h-24",
                             )}
                         />
                     ))}
                 </div>
             ) : error ? (
-                <Empty className="border">
+                <Empty className="rounded-3xl border bg-card/50">
                     <EmptyHeader>
                         <EmptyTitle>Could not load sources</EmptyTitle>
                         <EmptyDescription>
@@ -298,14 +388,24 @@ export function SourceLibrary({ workspaceId }: SourceLibraryProps) {
                     ))}
                 </div>
             ) : (
-                <Empty className="border">
+                <Empty className="rounded-3xl border border-dashed bg-muted/20 py-16">
                     <EmptyHeader>
+                        <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-2xl bg-muted">
+                            <BookOpenIcon className="size-5 text-muted-foreground" />
+                        </div>
                         <EmptyTitle>No sources found</EmptyTitle>
                         <EmptyDescription>
-                            Add a source or adjust your search filters.
+                            {hasActiveFilters
+                                ? "Try adjusting your search or filters."
+                                : "Add your first source to start building this notebook."}
                         </EmptyDescription>
                     </EmptyHeader>
-                    <EmptyContent>
+                    <EmptyContent className="flex flex-wrap justify-center gap-2">
+                        {hasActiveFilters ? (
+                            <Button variant="outline" onClick={clearFilters}>
+                                Clear filters
+                            </Button>
+                        ) : null}
                         <Button onClick={() => setAddOpen(true)}>
                             <PlusIcon />
                             Add source
@@ -363,27 +463,5 @@ export function SourceLibrary({ workspaceId }: SourceLibraryProps) {
                 </AlertDialogContent>
             </AlertDialog>
         </div>
-    );
-}
-
-function FilterChip({
-    label,
-    active,
-    onClick,
-}: {
-    label: string;
-    active: boolean;
-    onClick: () => void;
-}) {
-    return (
-        <Button
-            type="button"
-            size="sm"
-            variant={active ? "secondary" : "outline"}
-            className="rounded-full capitalize"
-            onClick={onClick}
-        >
-            {label}
-        </Button>
     );
 }
