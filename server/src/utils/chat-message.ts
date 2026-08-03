@@ -18,7 +18,7 @@ import type { MessageRecord } from "../repositories/message.repository.js";
  *   role: "user",
  *   parts: [{ type: "text", text: "What is " }, { type: "text", text: "RAG?" }]
  * })
- * // → "What is RAG?"
+ *  → "What is RAG?"
  * ```
  */
 export function getTextFromUIMessage(message: UIMessage) {
