@@ -3,13 +3,6 @@
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { MoreHorizontalIcon, PencilIcon, Trash2Icon } from "lucide-react";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -17,6 +10,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { getWorkspaceGradient } from "../lib/workspace-gradients";
 import { workspaceRoutes } from "../lib/routes";
 import type { Workspace } from "../lib/types";
 
@@ -24,45 +19,44 @@ type WorkspaceCardProps = {
     workspace: Workspace;
     onEdit: (workspace: Workspace) => void;
     onDelete: (workspace: Workspace) => void;
+    className?: string;
 };
 
 export function WorkspaceCard({
     workspace,
     onEdit,
     onDelete,
+    className,
 }: WorkspaceCardProps) {
     const href = workspaceRoutes.detail(workspace.id);
+    const gradient = getWorkspaceGradient(workspace.id);
 
     return (
-        <Card className="group/card relative transition-shadow hover:shadow-md">
+        <article
+            className={cn(
+                "group/card relative min-h-[196px] overflow-hidden rounded-3xl shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg",
+                className,
+            )}
+        >
             <Link
                 href={href}
-                className="absolute inset-0 z-0 rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className={cn(
+                    "absolute inset-0 z-0 bg-linear-to-br",
+                    gradient,
+                )}
                 aria-label={`Open ${workspace.title}`}
             />
 
-            <CardHeader className="relative">
-                <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-3">
-                        <span className="text-2xl leading-none">
-                            {workspace.icon ?? "📚"}
-                        </span>
-                        <div className="min-w-0">
-                            <CardTitle className="truncate group-hover/card:underline">
-                                {workspace.title}
-                            </CardTitle>
-                            <CardDescription>
-                                Updated{" "}
-                                {formatDistanceToNow(
-                                    new Date(workspace.updatedAt),
-                                    { addSuffix: true },
-                                )}
-                            </CardDescription>
-                        </div>
-                    </div>
+            <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/35 via-black/5 to-white/10" />
+
+            <div className="relative flex h-full min-h-[196px] flex-col p-5">
+                <div className="flex items-start justify-between gap-2">
+                    <span className="flex size-11 items-center justify-center rounded-2xl bg-white/20 text-2xl backdrop-blur-sm">
+                        {workspace.icon ?? "📚"}
+                    </span>
 
                     <div
-                        className="relative z-10"
+                        className="pointer-events-auto relative z-10"
                         onClick={(event) => event.stopPropagation()}
                         onKeyDown={(event) => event.stopPropagation()}
                     >
@@ -72,7 +66,7 @@ export function WorkspaceCard({
                                     <Button
                                         variant="ghost"
                                         size="icon-sm"
-                                        className="shrink-0"
+                                        className="size-8 bg-black/15 text-white hover:bg-black/25 hover:text-white"
                                     />
                                 }
                             >
@@ -97,15 +91,24 @@ export function WorkspaceCard({
                         </DropdownMenu>
                     </div>
                 </div>
-            </CardHeader>
 
-            {workspace.description ? (
-                <CardContent className="relative">
-                    <p className="line-clamp-2 text-sm text-muted-foreground">
-                        {workspace.description}
+                <div className="mt-auto space-y-1.5 pt-8 text-white">
+                    <h3 className="line-clamp-2 font-heading text-lg font-semibold leading-snug drop-shadow-sm">
+                        {workspace.title}
+                    </h3>
+                    {workspace.description ? (
+                        <p className="line-clamp-2 text-sm text-white/85">
+                            {workspace.description}
+                        </p>
+                    ) : null}
+                    <p className="text-xs text-white/70">
+                        Updated{" "}
+                        {formatDistanceToNow(new Date(workspace.updatedAt), {
+                            addSuffix: true,
+                        })}
                     </p>
-                </CardContent>
-            ) : null}
-        </Card>
+                </div>
+            </div>
+        </article>
     );
 }

@@ -84,7 +84,7 @@ export function WorkspaceFormDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {isEditing ? "Edit workspace" : "Create workspace"}
+                        {isEditing ? "Edit notebook" : "Create notebook"}
                     </DialogTitle>
                     <DialogDescription>
                         {isEditing
