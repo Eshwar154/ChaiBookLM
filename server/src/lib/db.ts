@@ -1,3 +1,18 @@
+/**
+ * Prisma Client singleton with PostgreSQL driver adapter.
+ *
+ * Reuses one client in development (via `globalThis`) to survive hot reloads.
+ * Requires `DATABASE_URL` in the environment.
+ *
+ * @example Input → Output
+ * ```ts
+ * import prisma from "./lib/db.js";
+ *
+ * await prisma.workspace.findMany({ where: { userId: "user_abc" } })
+ * // → [{ id: "ws_xyz", title: "ML Notes", ... }]
+ * ```
+ */
+
 import { PrismaClient } from "../generated/prisma/client.js";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";

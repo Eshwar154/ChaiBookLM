@@ -1,4 +1,12 @@
 /**
+ * Text chunking utilities for RAG source processing.
+ *
+ * Splits long documents into smaller {@link TextChunk} objects for embedding.
+ * Use {@link chunkText} for plain strings; use {@link chunkPages} for PDFs
+ * so page numbers are preserved in chunk metadata.
+ */
+
+/**
  * A single piece of text ready for embedding or retrieval.
  *
  * Long documents are split into many `TextChunk`s so an LLM/RAG pipeline can:

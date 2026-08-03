@@ -12,6 +12,21 @@ import {
 } from "../repositories/message.repository.js";
 import { NotFoundError } from "../types/app-error.js";
 
+/**
+ * Formats stored messages into a plain-text transcript for the summarizer prompt.
+ *
+ * @param messages - Message rows from the database
+ * @returns Transcript string with one `ROLE: content` block per message
+ *
+ * @example Input → Output
+ * ```ts
+ * formatMessagesForPrompt([
+ *   { role: "USER", content: "What is RAG?" },
+ *   { role: "ASSISTANT", content: "RAG stands for..." }
+ * ])
+ * // → "USER: What is RAG?\n\nASSISTANT: RAG stands for..."
+ * ```
+ */
 function formatMessagesForPrompt(
     messages: Awaited<ReturnType<typeof findMessagesByConversationId>>,
 ) {
@@ -20,6 +35,37 @@ function formatMessagesForPrompt(
         .join("\n\n");
 }
 
+/**
+ * Generates a rolling conversation summary and syncs recent learnings to Mem0.
+ *
+ * Called asynchronously (via Inngest) every N messages. The summary replaces
+ * older history in chat context; Mem0 receives the last 16 messages for extraction.
+ *
+ * @param conversationId - Conversation to summarize
+ * @param userId - Owner of the conversation (used for Mem0)
+ * @returns Updated conversation with `summary` and `summaryMessageCount`
+ * @throws {NotFoundError} When the conversation does not exist
+ *
+ * @example Input → Output
+ * ```ts
+ * await summarizeConversationById("conv_abc123", "user_xyz789")
+ * // → {
+ * //   id: "conv_abc123",
+ * //   workspaceId: "ws_001",
+ * //   title: "What is RAG?",
+ * //   summary: "The user asked about RAG and retrieval-augmented generation. ...",
+ * //   summaryMessageCount: 20,
+ * //   createdAt: Date,
+ * //   updatedAt: Date
+ * // }
+ * ```
+ *
+ * @example Input → Output (no messages)
+ * ```ts
+ * await summarizeConversationById("conv_empty", "user_xyz789")
+ * // → original conversation unchanged (no summary written)
+ * ```
+ */
 export async function summarizeConversationById(
     conversationId: string,
     userId: string,

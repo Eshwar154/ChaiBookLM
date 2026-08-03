@@ -1,12 +1,26 @@
+/**
+ * PDF text extraction utilities using `unpdf`.
+ *
+ * Supports in-memory buffers, direct URLs, and Cloudinary-hosted PDFs
+ * (with signed URL fallback when public access returns 401).
+ */
+
 import { extractText, getDocumentProxy } from "unpdf";
 import { getSignedCloudinaryDownloadUrl } from "./cloudinary.js";
 
+/** Result of extracting text from a PDF document. */
 export type PdfExtractResult = {
     text: string;
     pages: string[];
     pageCount: number;
 };
 
+/**
+ * Converts a Node.js Buffer to a standalone ArrayBuffer for `unpdf`.
+ *
+ * @param buffer - Node Buffer from Multer upload
+ * @returns ArrayBuffer view of the same bytes
+ */
 function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer {
     return buffer.buffer.slice(
         buffer.byteOffset,
@@ -14,6 +28,23 @@ function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer {
     ) as ArrayBuffer;
 }
 
+/**
+ * Extracts plain text from a PDF buffer (upload-time or downloaded file).
+ *
+ * @param buffer - PDF bytes as Buffer or ArrayBuffer
+ * @returns Joined full text, per-page strings, and total page count
+ * @throws When no text could be extracted from the PDF
+ *
+ * @example Input → Output
+ * ```ts
+ * await extractPdfFromBuffer(uploadedFile.buffer)
+ * // → {
+ * //   text: "Chapter 1\n\nIntroduction to ML...\n\nChapter 2\n\n...",
+ * //   pages: ["Chapter 1\n\nIntroduction...", "Chapter 2\n\n..."],
+ * //   pageCount: 12
+ * // }
+ * ```
+ */
 export async function extractPdfFromBuffer(
     buffer: ArrayBuffer | Buffer,
 ): Promise<PdfExtractResult> {
@@ -40,6 +71,19 @@ export async function extractPdfFromBuffer(
     };
 }
 
+/**
+ * Downloads a PDF from a URL and extracts its text.
+ *
+ * @param url - Public or signed URL to the PDF file
+ * @returns Extracted text and per-page content
+ * @throws When download fails or extraction yields no text
+ *
+ * @example Input → Output
+ * ```ts
+ * await extractPdfFromUrl("https://example.com/paper.pdf")
+ * // → { text: "Abstract\n\n...", pages: ["Abstract\n\n..."], pageCount: 8 }
+ * ```
+ */
 async function downloadPdf(url: string) {
     const response = await fetch(url);
 
@@ -55,6 +99,30 @@ export async function extractPdfFromUrl(url: string): Promise<PdfExtractResult> 
     return extractPdfFromBuffer(buffer);
 }
 
+/**
+ * Extracts text from a PDF stored on Cloudinary.
+ *
+ * Tries the public `fileUrl` first; on 401, falls back to a signed download URL
+ * when `publicId` and Cloudinary API credentials are available.
+ *
+ * @param input - Cloudinary file URL, public id, and resource type
+ * @returns Extracted text and per-page content
+ * @throws When download or extraction fails, or signed URL cannot be generated
+ *
+ * @example Input → Output
+ * ```ts
+ * await extractPdfFromCloudinary({
+ *   fileUrl: "https://res.cloudinary.com/demo/raw/upload/v1/chaibook/pdfs/notes.pdf",
+ *   publicId: "chaibook/pdfs/notes",
+ *   resourceType: "raw"
+ * })
+ * // → {
+ * //   text: "Full PDF text...",
+ * //   pages: ["Page 1 text...", "Page 2 text..."],
+ * //   pageCount: 5
+ * // }
+ * ```
+ */
 export async function extractPdfFromCloudinary(input: {
     fileUrl: string;
     publicId?: string;

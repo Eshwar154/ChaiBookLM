@@ -1,3 +1,10 @@
+/**
+ * RAG retrieval and chat system prompt construction.
+ *
+ * Embeds the user query, searches Pinecone, filters by score,
+ * and builds the system prompt with retrieved context, memories, and summary.
+ */
+
 import { RAG_MIN_SCORE, RAG_TOP_K } from "../ai-config.js";
 import { embedTexts } from "../openai.js";
 import {
@@ -5,6 +12,7 @@ import {
     type VectorMetadata,
 } from "../pinecone.js";
 
+/** A source chunk returned from Pinecone with similarity score. */
 export type RetrievedChunk = {
     sourceId: string;
     sourceTitle: string;
@@ -16,6 +24,7 @@ export type RetrievedChunk = {
     score: number;
 };
 
+/** Citation object stored on assistant messages and shown in the chat UI. */
 export type ChatCitation = {
     sourceId: string;
     sourceTitle: string;
@@ -27,6 +36,28 @@ export type ChatCitation = {
     score: number;
 };
 
+/**
+ * Validates and normalizes raw Pinecone metadata into {@link VectorMetadata}.
+ *
+ * @param metadata - Loose metadata object from a Pinecone match
+ * @returns Typed metadata, or `null` when required fields are missing
+ *
+ * @example Input → Output
+ * ```ts
+ * asVectorMetadata({
+ *   sourceId: "src_001",
+ *   sourceTitle: "ML Notes",
+ *   sourceType: "PDF",
+ *   chunkId: "chunk_001",
+ *   chunkIndex: 0,
+ *   text: "Gradient descent..."
+ * })
+ * // → { workspaceId: "", sourceId: "src_001", sourceTitle: "ML Notes", ... }
+ *
+ * asVectorMetadata({ invalid: true })
+ * // → null
+ * ```
+ */
 function asVectorMetadata(
     metadata: Record<string, unknown> | undefined,
 ): VectorMetadata | null {
@@ -53,6 +84,36 @@ function asVectorMetadata(
     };
 }
 
+/**
+ * Retrieves the most relevant source chunks for a user query via vector search.
+ *
+ * @param workspaceId - Workspace namespace in Pinecone
+ * @param query - User message text to embed and search with
+ * @returns Chunks scoring above {@link RAG_MIN_SCORE}, up to {@link RAG_TOP_K}
+ *
+ * @example Input → Output
+ * ```ts
+ * await retrieveWorkspaceContext("ws_xyz789", "What is gradient descent?")
+ * // → [
+ * //   {
+ * //     sourceId: "src_001",
+ * //     sourceTitle: "ML Notes",
+ * //     sourceType: "PDF",
+ * //     chunkId: "chunk_003",
+ * //     chunkIndex: 2,
+ * //     page: 4,
+ * //     text: "Gradient descent is an iterative optimization algorithm...",
+ * //     score: 0.87
+ * //   }
+ * // ]
+ * ```
+ *
+ * @example Input → Output (no matches above threshold)
+ * ```ts
+ * await retrieveWorkspaceContext("ws_xyz789", "unrelated query")
+ * // → []
+ * ```
+ */
 export async function retrieveWorkspaceContext(
     workspaceId: string,
     query: string,
@@ -98,6 +159,36 @@ export async function retrieveWorkspaceContext(
     return chunks;
 }
 
+/**
+ * Converts retrieved chunks into citation objects for persistence and UI display.
+ *
+ * @param chunks - RAG retrieval results
+ * @returns Citations with truncated excerpts (max 280 chars)
+ *
+ * @example Input → Output
+ * ```ts
+ * toChatCitations([{
+ *   sourceId: "src_001",
+ *   sourceTitle: "ML Notes",
+ *   sourceType: "PDF",
+ *   chunkId: "chunk_003",
+ *   chunkIndex: 2,
+ *   page: 4,
+ *   text: "Gradient descent is an iterative optimization algorithm...",
+ *   score: 0.87
+ * }])
+ * // → [{
+ * //   sourceId: "src_001",
+ * //   sourceTitle: "ML Notes",
+ * //   sourceType: "PDF",
+ * //   chunkId: "chunk_003",
+ * //   chunkIndex: 2,
+ * //   page: 4,
+ * //   excerpt: "Gradient descent is an iterative optimization algorithm...",
+ * //   score: 0.87
+ * // }]
+ * ```
+ */
 export function toChatCitations(chunks: RetrievedChunk[]): ChatCitation[] {
     return chunks.map((chunk) => ({
         sourceId: chunk.sourceId,
@@ -111,12 +202,52 @@ export function toChatCitations(chunks: RetrievedChunk[]): ChatCitation[] {
     }));
 }
 
+/**
+ * Builds a RAG-only system prompt from retrieved chunks (legacy helper).
+ *
+ * @param chunks - Retrieved source chunks
+ * @returns System prompt string with numbered context blocks
+ *
+ * @example Input → Output
+ * ```ts
+ * buildRagSystemPrompt([{ sourceTitle: "ML Notes", sourceType: "PDF", text: "...", ... }])
+ * // → "You are Chaibook...\n\nRetrieved context:\n[1] ML Notes (PDF)\n..."
+ * ```
+ */
 export function buildRagSystemPrompt(chunks: RetrievedChunk[]) {
     return buildChatSystemPrompt({ chunks });
 }
 
 export type UserMemoryContext = string;
 
+/**
+ * Builds the full chat system prompt with RAG context, user memories, summary, and web search hints.
+ *
+ * @param input - Prompt building blocks from chat service
+ * @returns Multi-section system prompt string for `streamText`
+ *
+ * @example Input → Output
+ * ```ts
+ * buildChatSystemPrompt({
+ *   chunks: [{
+ *     sourceTitle: "ML Notes",
+ *     sourceType: "PDF",
+ *     page: 3,
+ *     text: "Gradient descent minimizes loss by..."
+ *   }],
+ *   conversationSummary: "The user has been studying optimization.",
+ *   userMemories: ["Prefers concise explanations"],
+ *   webSearchEnabled: true
+ * })
+ * // → "You are Chaibook, an assistant...\n\nYou have access to a web_search tool...\n\nKnown facts about this user...\n\nEarlier conversation summary...\n\nRetrieved context:\n[1] ML Notes (PDF), page 3\nGradient descent minimizes..."
+ * ```
+ *
+ * @example Input → Output (no chunks)
+ * ```ts
+ * buildChatSystemPrompt({ chunks: [], webSearchEnabled: false })
+ * // → "...This workspace has no indexed source content yet...Do not invent citations."
+ * ```
+ */
 export function buildChatSystemPrompt(input: {
     chunks: RetrievedChunk[];
     conversationSummary?: string | null;

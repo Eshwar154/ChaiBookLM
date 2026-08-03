@@ -18,10 +18,43 @@ import {
 import { getWorkspaceByIdForUser } from "./workspace.service.js";
 import type { CreateArtifactInput } from "../validators/artifact.validator.js";
 
+/**
+ * Verifies the user owns the workspace before any artifact operation proceeds.
+ *
+ * @param workspaceId - Workspace being accessed
+ * @param userId - Authenticated user's id
+ * @throws {NotFoundError} When the workspace is not found for this user
+ */
 async function assertWorkspaceAccess(workspaceId: string, userId: string) {
     await getWorkspaceByIdForUser(workspaceId, userId);
 }
 
+/**
+ * Lists all learning artifacts in a workspace.
+ *
+ * @param workspaceId - Workspace to list artifacts from
+ * @param userId - Authenticated user's id
+ * @returns Artifact records ordered by creation time
+ *
+ * @example Input → Output
+ * ```ts
+ * await listArtifactsForWorkspace("ws_xyz789", "user_abc123")
+ * // → [
+ * //   {
+ * //     id: "art_001",
+ * //     workspaceId: "ws_xyz789",
+ * //     type: "FLASHCARDS",
+ * //     title: "Flashcards · 8/3/2026",
+ * //     status: "READY",
+ * //     sourceIds: ["src_001", "src_002"],
+ * //     content: { cards: [...] },
+ * //     metadata: { generatedAt: "2026-08-03T10:00:00.000Z" },
+ * //     createdAt: Date,
+ * //     updatedAt: Date
+ * //   }
+ * // ]
+ * ```
+ */
 export async function listArtifactsForWorkspace(
     workspaceId: string,
     userId: string,
@@ -30,6 +63,28 @@ export async function listArtifactsForWorkspace(
     return findArtifactsByWorkspaceId(workspaceId);
 }
 
+/**
+ * Loads a single artifact after verifying workspace ownership.
+ *
+ * @param workspaceId - Workspace the artifact belongs to
+ * @param artifactId - Artifact to fetch
+ * @param userId - Authenticated user's id
+ * @returns Artifact record with content when status is `READY`
+ * @throws {NotFoundError} When the artifact does not exist in this workspace
+ *
+ * @example Input → Output
+ * ```ts
+ * await getArtifactForWorkspace("ws_xyz789", "art_001", "user_abc123")
+ * // → {
+ * //   id: "art_001",
+ * //   type: "QUIZ",
+ * //   title: "Chapter 5 Quiz",
+ * //   status: "READY",
+ * //   content: { questions: [...] },
+ * //   ...
+ * // }
+ * ```
+ */
 export async function getArtifactForWorkspace(
     workspaceId: string,
     artifactId: string,
@@ -49,6 +104,40 @@ export async function getArtifactForWorkspace(
     return artifact;
 }
 
+/**
+ * Creates a pending artifact and enqueues background generation via Inngest.
+ *
+ * Validates that ready sources exist before creating the row. The actual AI
+ * generation runs asynchronously in {@link processArtifactById}.
+ *
+ * @param workspaceId - Workspace to attach the artifact to
+ * @param userId - Authenticated user's id
+ * @param input - Artifact type, optional title, optional source id filter
+ * @returns New artifact with status `PENDING`
+ * @throws {ValidationError} When no ready sources are available
+ *
+ * @example Input → Output
+ * ```ts
+ * await createArtifactForWorkspace("ws_xyz789", "user_abc123", {
+ *   type: "FLASHCARDS",
+ *   title: "ML Chapter 3 Cards",
+ *   sourceIds: ["src_001"]
+ * })
+ * // → {
+ * //   id: "art_new456",
+ * //   workspaceId: "ws_xyz789",
+ * //   type: "FLASHCARDS",
+ * //   title: "ML Chapter 3 Cards",
+ * //   status: "PENDING",
+ * //   sourceIds: ["src_001"],
+ * //   content: null,
+ * //   metadata: null,
+ * //   createdAt: Date,
+ * //   updatedAt: Date
+ * // }
+ * // (Inngest job enqueued to generate content)
+ * ```
+ */
 export async function createArtifactForWorkspace(
     workspaceId: string,
     userId: string,
@@ -79,6 +168,21 @@ export async function createArtifactForWorkspace(
     return artifact;
 }
 
+/**
+ * Deletes an artifact from the workspace.
+ *
+ * @param workspaceId - Workspace the artifact belongs to
+ * @param artifactId - Artifact to delete
+ * @param userId - Authenticated user's id
+ * @returns Resolves when the artifact row is deleted
+ * @throws {NotFoundError} When the artifact is not found
+ *
+ * @example Input → Output
+ * ```ts
+ * await deleteArtifactForWorkspace("ws_xyz789", "art_001", "user_abc123")
+ * // → void
+ * ```
+ */
 export async function deleteArtifactForWorkspace(
     workspaceId: string,
     artifactId: string,
@@ -88,6 +192,39 @@ export async function deleteArtifactForWorkspace(
     await deleteArtifactRecord(artifactId);
 }
 
+/**
+ * Runs the full artifact generation pipeline (used by Inngest worker).
+ *
+ * ```
+ * status: PROCESSING
+ *   → gatherSourceContext
+ *   → generateArtifactContent
+ *   → status: READY (or FAILED on error)
+ * ```
+ *
+ * @param artifactId - Artifact to generate content for
+ * @returns Updated artifact with `READY` status and generated content
+ * @throws When the artifact is missing or generation fails (status set to `FAILED`)
+ *
+ * @example Input → Output (success)
+ * ```ts
+ * await processArtifactById("art_001")
+ * // → {
+ * //   id: "art_001",
+ * //   status: "READY",
+ * //   content: { cards: [{ front: "...", back: "..." }] },
+ * //   metadata: { generatedAt: "2026-08-03T10:05:00.000Z", processingError: undefined }
+ * // }
+ * ```
+ *
+ * @example Input → Output (failure)
+ * ```ts
+ * await processArtifactById("art_broken")
+ * // → artifact status set to "FAILED"
+ * // → metadata.processingError: "No ready sources found..."
+ * // → throws the same error
+ * ```
+ */
 export async function processArtifactById(artifactId: string) {
     const artifact = await findArtifactById(artifactId);
     if (!artifact) {
