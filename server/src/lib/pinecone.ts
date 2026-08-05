@@ -61,11 +61,6 @@ async function waitForIndexReady(name: string) {
  *
  * @returns Resolves when the index is available
  *
- * @example Input → Output
- * ```ts
- * await ensurePineconeIndex()
- * // → void (index "chaibook" exists with dimension 1536, cosine metric)
- * ```
  */
 export async function ensurePineconeIndex() {
     if (indexReady) {
@@ -99,11 +94,6 @@ export async function ensurePineconeIndex() {
  *
  * @returns Pinecone `Index` instance
  *
- * @example Input → Output
- * ```ts
- * const index = await getPineconeIndex()
- * // → Index { name: "chaibook", ... }
- * ```
  */
 export async function getPineconeIndex(): Promise<Index> {
     await ensurePineconeIndex();
@@ -129,23 +119,6 @@ export type VectorMetadata = {
  * @param records - Vector records with embeddings and metadata
  * @returns Resolves immediately when `records` is empty
  *
- * @example Input → Output
- * ```ts
- * await upsertSourceVectors("ws_xyz789", [{
- *   id: "chunk_001",
- *   values: [0.012, -0.034, ...],
- *   metadata: {
- *     workspaceId: "ws_xyz789",
- *     sourceId: "src_001",
- *     chunkId: "chunk_001",
- *     chunkIndex: 0,
- *     sourceTitle: "ML Notes",
- *     sourceType: "PDF",
- *     text: "Gradient descent is..."
- *   }
- * }])
- * // → void
- * ```
  */
 export async function upsertSourceVectors(
     workspaceId: string,
@@ -171,11 +144,6 @@ export async function upsertSourceVectors(
  * @param sourceId - Source whose vectors should be removed
  * @returns Resolves when deletion completes
  *
- * @example Input → Output
- * ```ts
- * await deleteSourceVectors("ws_xyz789", "src_001")
- * // → void (all vectors with metadata.sourceId === "src_001" deleted)
- * ```
  */
 export async function deleteSourceVectors(
     workspaceId: string,
@@ -195,11 +163,6 @@ export async function deleteSourceVectors(
  * @param workspaceId - Pinecone namespace to wipe
  * @returns Resolves when all vectors in the namespace are deleted
  *
- * @example Input → Output
- * ```ts
- * await deleteWorkspaceVectors("ws_xyz789")
- * // → void
- * ```
  */
 export async function deleteWorkspaceVectors(workspaceId: string) {
     const index = await getPineconeIndex();
@@ -214,18 +177,6 @@ export async function deleteWorkspaceVectors(workspaceId: string) {
  * @param topK - Maximum number of matches to return
  * @returns Pinecone match objects with scores and metadata
  *
- * @example Input → Output
- * ```ts
- * await queryWorkspaceVectors("ws_xyz789", queryEmbedding, 6)
- * // → [
- * //   {
- * //     id: "chunk_001",
- * //     score: 0.87,
- * //     metadata: { sourceTitle: "ML Notes", text: "Gradient descent...", ... }
- * //   },
- * //   ...
- * // ]
- * ```
  */
 export async function queryWorkspaceVectors(
     workspaceId: string,

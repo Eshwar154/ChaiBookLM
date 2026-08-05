@@ -12,8 +12,7 @@
  *   → status: READY
  * ```
  *
- * `processSourceById` runs all three steps in one call (used for sync processing).
- * In production, Inngest runs the same steps as separate durable jobs.
+ * Inngest runs these steps as separate durable jobs.
  */
 
 import type { PineconeRecord } from "@pinecone-database/pinecone";
@@ -55,40 +54,6 @@ type SourceMetadata = {
 };
 
 /**
- * Safely casts Prisma's loose JSON metadata into our typed shape.
- * Returns `{}` if metadata is null, not an object, or an array.
- *
- * @example
- * ```ts
- * asMetadata({ fileUrl: "https://...", pageCount: 12 })
- * // → { fileUrl: "https://...", pageCount: 12 }
- *
- * asMetadata(null)
- * // → {}
- * ```
- */
-function asMetadata(metadata: SourceRecord["metadata"]): SourceMetadata {
-    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-        return {};
-    }
-    return metadata as SourceMetadata;
-}
-
-/**
- * Rough token estimate for a text string (~4 characters per token).
- * Used when saving chunks so we can track size without calling the tokenizer.
- *
- * @example
- * ```ts
- * estimateTokenCount("Hello world")  // 12 chars → 3 tokens
- * estimateTokenCount("abcdefghijklmnop")  // 16 chars → 4 tokens
- * ```
- */
-function estimateTokenCount(text: string) {
-    return Math.ceil(text.length / 4);
-}
-
-/**
  * Reads extractable text from a source record.
  *
  * **Two paths:**
@@ -97,39 +62,24 @@ function estimateTokenCount(text: string) {
  *
  * @throws If PDF is missing `fileUrl` or source has no content at all
  *
- * @example Text source
- * ```ts
- * // source.content = "Notes from lecture..."
- * await extractSourceText(source)
- * // → {
- * //   text: "Notes from lecture...",
- * //   pageCount: undefined,
- * //   pages: undefined
- * // }
- * ```
  *
- * @example PDF source
- * ```ts
- * source.type = "PDF", metadata.fileUrl = "https://res.cloudinary.com/..."
- * await extractSourceText(source)
- *  → {
- * text: "Full PDF text concatenated...",
- *   pageCount: 5,
- *  pages: ["Page 1 text...", "Page 2 text...", ...]
- * }
- * ```
  */
 async function extractSourceText(source: SourceRecord) {
     if (source.content?.trim()) {
         return {
             text: source.content.trim(),
-            pageCount: undefined as number | undefined,
-            pages: undefined as string[] | undefined,
+            pageCount: undefined,
+            pages: undefined,
         };
     }
 
     if (source.type === "PDF") {
-        const metadata = asMetadata(source.metadata);
+        const metadata =
+            source.metadata &&
+            typeof source.metadata === "object" &&
+            !Array.isArray(source.metadata)
+                ? (source.metadata as SourceMetadata)
+                : {};
         if (!metadata.fileUrl) {
             throw new Error("PDF source is missing fileUrl metadata");
         }
@@ -152,13 +102,8 @@ async function extractSourceText(source: SourceRecord) {
 /**
  * Sets a source's status to `PROCESSING` while the pipeline runs.
  *
- * @example
- * ```ts
- * await markSourceProcessing("src_abc123")
- * // DB: { id: "src_abc123", status: "PROCESSING", ... }
- * ```
  */
-export async function markSourceProcessing(sourceId: string) {
+export function markSourceProcessing(sourceId: string) {
     return updateSourceRecord(sourceId, { status: "PROCESSING" });
 }
 
@@ -166,18 +111,6 @@ export async function markSourceProcessing(sourceId: string) {
  * Marks a source as `FAILED` and stores the error message in metadata.
  * Called when extract, chunk, or embed steps throw.
  *
- * @example
- * ```ts
- * await markSourceFailed("src_abc123", new Error("PDF extraction failed"), source.metadata)
- *  DB update:
- *  {
- *    status: "FAILED",
- *    metadata: {
- *      ...existingMetadata,
- *      processingError: "PDF extraction failed"
- *    }
- *  }
- * ```
  */
 export async function markSourceFailed(
     sourceId: string,
@@ -187,7 +120,12 @@ export async function markSourceFailed(
     const message =
         error instanceof Error ? error.message : "Source processing failed";
 
-    const metadata = asMetadata(existingMetadata);
+    const metadata =
+        existingMetadata &&
+        typeof existingMetadata === "object" &&
+        !Array.isArray(existingMetadata)
+            ? (existingMetadata as SourceMetadata)
+            : {};
 
     return updateSourceRecord(sourceId, {
         status: "FAILED",
@@ -208,17 +146,6 @@ export async function markSourceFailed(
  *
  * @returns Extracted text plus page array (PDF only) for the chunking step
  *
- * @example
- * ```ts
- * await extractSourceContent("src_abc123")
- *  → {
- *    sourceId: "src_abc123",
- *    workspaceId: "ws_xyz",
- *    text: "Introduction to machine learning...",
- *    pages: ["Page 1...", "Page 2..."],  // undefined for non-PDF
- *    source: { id: "src_abc123", type: "PDF", title: "ML Notes", ... }
- *  }
- * ```
  */
 export async function extractSourceContent(sourceId: string) {
     const source = await findSourceById(sourceId);
@@ -227,7 +154,12 @@ export async function extractSourceContent(sourceId: string) {
     }
 
     const extracted = await extractSourceText(source);
-    const metadata = asMetadata(source.metadata);
+    const metadata =
+        source.metadata &&
+        typeof source.metadata === "object" &&
+        !Array.isArray(source.metadata)
+            ? (source.metadata as SourceMetadata)
+            : {};
 
     await updateSourceRecord(sourceId, {
         content: extracted.text,
@@ -259,21 +191,7 @@ export async function extractSourceContent(sourceId: string) {
  * @param pages - Optional per-page strings from PDF extraction
  * @returns Saved chunk records from the database
  *
- * @example PDF with pages
- * ```ts
- * await chunkSourceContent("src_abc123", fullText, ["Page 1...", "Page 2..."])
- * // Postgres source_chunk rows:
- * // [
- * //   { id: "chunk_1", sourceId: "src_abc123", index: 0, content: "Page 1...", tokenCount: 42, metadata: { page: 1 } },
- * //   { id: "chunk_2", sourceId: "src_abc123", index: 1, content: "Page 2...", tokenCount: 38, metadata: { page: 2 } }
- * // ]
- * ```
  *
- * @example Plain text (no pages)
- * ```ts
- * await chunkSourceContent("src_abc123", "Long article text...")
- * // → chunks with metadata: null (no page numbers)
- * ```
  */
 export async function chunkSourceContent(
     sourceId: string,
@@ -282,26 +200,21 @@ export async function chunkSourceContent(
 ) {
     await deleteChunksBySourceId(sourceId);
 
-    const chunks =
-        pages && pages.length > 0
-            ? chunkPages(pages)
-            : chunkText(text);
+    const chunks = pages?.length ? chunkPages(pages) : chunkText(text);
 
     if (chunks.length === 0) {
         throw new Error("No chunks were generated from source content");
     }
 
-    const saved = await createSourceChunks(
+    return createSourceChunks(
         chunks.map((chunk) => ({
             sourceId,
             index: chunk.index,
             content: chunk.content,
-            tokenCount: estimateTokenCount(chunk.content),
+            tokenCount: Math.ceil(chunk.content.length / 4),
             metadata: chunk.metadata as Prisma.InputJsonValue | undefined,
         })),
     );
-
-    return saved;
 }
 
 /**
@@ -319,35 +232,7 @@ export async function chunkSourceContent(
  * @param chunks - Chunk rows already saved in Postgres (must have `id`)
  * @returns Updated source record with status `READY`
  *
- * @example Pinecone record shape (one per chunk)
- * ```ts
- * {
- *   id: "chunk_1",
- *   values: [0.012, -0.034, ...],  // 1536-dim embedding vector
- *   metadata: {
- *     workspaceId: "ws_xyz",
- *     sourceId: "src_abc123",
- *     chunkId: "chunk_1",
- *     chunkIndex: 0,
- *     sourceTitle: "ML Notes",
- *     sourceType: "PDF",
- *     text: "Introduction to machine learning...",
- *     page: 1
- *   }
- * }
- * ```
  *
- * @example Source after indexing
- * ```ts
- * DB: {
- *   status: "READY",
- *    metadata: {
- *      chunkCount: 12,
- *      indexedAt: "2026-08-03T10:00:00.000Z",
- *      processingError: undefined
- *    }
- *  }
- * ```
  */
 export async function embedAndIndexSource(
     source: SourceRecord,
@@ -391,7 +276,12 @@ export async function embedAndIndexSource(
 
     await upsertSourceVectors(source.workspaceId, records);
 
-    const metadata = asMetadata(source.metadata);
+    const metadata =
+        source.metadata &&
+        typeof source.metadata === "object" &&
+        !Array.isArray(source.metadata)
+            ? (source.metadata as SourceMetadata)
+            : {};
 
     return updateSourceRecord(source.id, {
         status: "READY",
@@ -405,69 +295,9 @@ export async function embedAndIndexSource(
 }
 
 /**
- * Runs the full source processing pipeline in one call.
- *
- * ```
- * markSourceProcessing
- *   → extractSourceContent
- *   → chunkSourceContent
- *   → embedAndIndexSource
- * ```
- *
- * On any error, calls `markSourceFailed` and re-throws.
- *
- * @example Success
- * ```ts
- * await processSourceById("src_abc123")
- * → updated source with status: "READY", metadata.chunkCount: 12
- * ```
- *
- * @example Failure
- * ```ts
- * await processSourceById("src_missing_pdf")
- *  → source status set to "FAILED"
- *  → metadata.processingError: "PDF source is missing fileUrl metadata"
- * → throws the same error
- * ```
- */
-export async function processSourceById(sourceId: string) {
-    const source = await findSourceById(sourceId);
-    if (!source) {
-        throw new Error("Source not found");
-    }
-
-    await markSourceProcessing(sourceId);
-
-    try {
-        const extracted = await extractSourceContent(sourceId);
-        const chunks = await chunkSourceContent(
-            sourceId,
-            extracted.text,
-            extracted.pages,
-        );
-        const updatedSource =
-            (await findSourceById(sourceId)) ?? extracted.source;
-
-        return embedAndIndexSource(updatedSource, chunks);
-    } catch (error) {
-        const current = await findSourceById(sourceId);
-        if (current) {
-            await markSourceFailed(sourceId, error, current.metadata);
-        }
-        throw error;
-    }
-}
-
-/**
  * Removes a source from the vector index and deletes its chunks from Postgres.
  * Used when a source is deleted or needs to be fully re-indexed from scratch.
  *
- * @example
- * ```ts
- * await removeSourceFromIndex("ws_xyz", "src_abc123")
- *  → Pinecone vectors for source deleted
- *  → All source_chunk rows for sourceId deleted
- * ```
  */
 export async function removeSourceFromIndex(
     workspaceId: string,
@@ -481,17 +311,6 @@ export async function removeSourceFromIndex(
  * Returns all chunks for a source plus the total count.
  * Useful for debugging, admin UI, or verifying processing completed.
  *
- * @example
- * ```ts
- * await listChunksForSource("src_abc123")
- *  → {
- *    chunks: [
- *      { id: "chunk_1", index: 0, content: "...", tokenCount: 42, metadata: { page: 1 }, ... },
- *      { id: "chunk_2", index: 1, content: "...", tokenCount: 38, metadata: { page: 2 }, ... }
- *   ],
- *    count: 2
- * }
- * ```
  */
 export async function listChunksForSource(sourceId: string) {
     const [chunks, count] = await Promise.all([

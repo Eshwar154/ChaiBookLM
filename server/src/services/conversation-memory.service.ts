@@ -13,29 +13,6 @@ import {
 import { NotFoundError } from "../types/app-error.js";
 
 /**
- * Formats stored messages into a plain-text transcript for the summarizer prompt.
- *
- * @param messages - Message rows from the database
- * @returns Transcript string with one `ROLE: content` block per message
- *
- * @example Input → Output
- * ```ts
- * formatMessagesForPrompt([
- *   { role: "USER", content: "What is RAG?" },
- *   { role: "ASSISTANT", content: "RAG stands for..." }
- * ])
- * // → "USER: What is RAG?\n\nASSISTANT: RAG stands for..."
- * ```
- */
-function formatMessagesForPrompt(
-    messages: Awaited<ReturnType<typeof findMessagesByConversationId>>,
-) {
-    return messages
-        .map((message) => `${message.role}: ${message.content}`)
-        .join("\n\n");
-}
-
-/**
  * Generates a rolling conversation summary and syncs recent learnings to Mem0.
  *
  * Called asynchronously (via Inngest) every N messages. The summary replaces
@@ -46,25 +23,7 @@ function formatMessagesForPrompt(
  * @returns Updated conversation with `summary` and `summaryMessageCount`
  * @throws {NotFoundError} When the conversation does not exist
  *
- * @example Input → Output
- * ```ts
- * await summarizeConversationById("conv_abc123", "user_xyz789")
- * // → {
- * //   id: "conv_abc123",
- * //   workspaceId: "ws_001",
- * //   title: "What is RAG?",
- * //   summary: "The user asked about RAG and retrieval-augmented generation. ...",
- * //   summaryMessageCount: 20,
- * //   createdAt: Date,
- * //   updatedAt: Date
- * // }
- * ```
  *
- * @example Input → Output (no messages)
- * ```ts
- * await summarizeConversationById("conv_empty", "user_xyz789")
- * // → original conversation unchanged (no summary written)
- * ```
  */
 export async function summarizeConversationById(
     conversationId: string,
@@ -82,7 +41,9 @@ export async function summarizeConversationById(
         return conversation;
     }
 
-    const transcript = formatMessagesForPrompt(messages);
+    const transcript = messages
+        .map((message) => `${message.role}: ${message.content}`)
+        .join("\n\n");
     const previousSummary = conversation.summary?.trim();
 
     const { text: summary } = await generateText({

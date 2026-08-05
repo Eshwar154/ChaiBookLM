@@ -20,22 +20,20 @@ export const processSource = inngest.createFunction(
     async ({ event, step }) => {
         const { sourceId } = event.data;
 
-        await step.run("mark-processing", async () => {
-            await markSourceProcessing(sourceId);
-        });
+        await step.run("mark-processing", () => markSourceProcessing(sourceId));
 
         try {
-            const extracted = await step.run("extract-content", async () => {
-                return extractSourceContent(sourceId);
-            });
+            const extracted = await step.run("extract-content", () =>
+                extractSourceContent(sourceId),
+            );
 
-            await step.run("chunk-content", async () => {
-                await chunkSourceContent(
+            await step.run("chunk-content", () =>
+                chunkSourceContent(
                     sourceId,
                     extracted.text,
                     extracted.pages,
-                );
-            });
+                ),
+            );
 
             const result = await step.run("embed-and-index", async () => {
                 const source = await findSourceById(sourceId);
@@ -71,9 +69,7 @@ export const generateArtifact = inngest.createFunction(
     async ({ event, step }) => {
         const { artifactId } = event.data;
 
-        await step.run("generate", async () => {
-            await processArtifactById(artifactId);
-        });
+        await step.run("generate", () => processArtifactById(artifactId));
 
         return { artifactId, status: "READY" };
     },
@@ -88,9 +84,9 @@ export const summarizeConversation = inngest.createFunction(
     async ({ event, step }) => {
         const { conversationId, userId } = event.data;
 
-        await step.run("summarize", async () => {
-            await summarizeConversationById(conversationId, userId);
-        });
+        await step.run("summarize", () =>
+            summarizeConversationById(conversationId, userId),
+        );
 
         return { conversationId, status: "SUMMARIZED" };
     },

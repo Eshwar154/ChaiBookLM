@@ -10,29 +10,6 @@ export const CHAT_MODEL = "gpt-4o-mini";
 /** Allowed chat models exposed to the client and workspace settings. */
 export const CHAT_MODELS = ["gpt-4o-mini", "gpt-4o"] as const;
 
-export type ChatModelId = (typeof CHAT_MODELS)[number];
-
-/**
- * Validates and resolves a chat model id, falling back to {@link CHAT_MODEL}.
- *
- * @param model - Model id from client or workspace (may be null/undefined)
- * @returns A supported {@link ChatModelId}
- *
- * @example Input → Output
- * ```ts
- * resolveChatModel("gpt-4o")       // → "gpt-4o"
- * resolveChatModel("invalid")      // → "gpt-4o-mini" (default)
- * resolveChatModel(null)             // → "gpt-4o-mini"
- * ```
- */
-export function resolveChatModel(model?: string | null): ChatModelId {
-    if (model && CHAT_MODELS.includes(model as ChatModelId)) {
-        return model as ChatModelId;
-    }
-
-    return CHAT_MODEL;
-}
-
 /** OpenAI embedding model used for RAG vector indexing and query embedding. */
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 

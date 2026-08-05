@@ -12,16 +12,6 @@ import { inngest } from "../inngest/client.js";
  * @param input - Source and workspace ids for the processing worker
  * @returns Resolves when the event is accepted by Inngest
  *
- * @example Input → Output
- * ```ts
- * await enqueueSourceProcessing({
- *   sourceId: "src_001",
- *   workspaceId: "ws_xyz789"
- * })
- * // → void
- * // Inngest receives: { name: "source/created", data: { sourceId, workspaceId } }
- * // Worker runs: extractSourceContent → chunkSourceContent → embedAndIndexSource
- * ```
  */
 export async function enqueueSourceProcessing(input: {
     sourceId: string;

@@ -17,12 +17,6 @@ const clientUrl = process.env.CLIENT_URL ?? "http://localhost:3000";
 /**
  * Configured Better Auth instance shared by Express route handlers.
  *
- * @example Usage in routes
- * ```ts
- * // POST /api/auth/sign-in/social → redirects to Google
- * // GET  /api/auth/callback/google → creates session cookie
- * // req.session.user populated by auth middleware after sign-in
- * ```
  */
 export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_URL ?? clientUrl,

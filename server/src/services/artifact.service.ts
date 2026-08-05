@@ -11,23 +11,11 @@ import {
 } from "../repositories/artifact.repository.js";
 import { NotFoundError } from "../types/app-error.js";
 import {
-    defaultArtifactTitle,
     gatherSourceContext,
     generateArtifactContent,
 } from "./artifact-generation.service.js";
 import { getWorkspaceByIdForUser } from "./workspace.service.js";
 import type { CreateArtifactInput } from "../validators/artifact.validator.js";
-
-/**
- * Verifies the user owns the workspace before any artifact operation proceeds.
- *
- * @param workspaceId - Workspace being accessed
- * @param userId - Authenticated user's id
- * @throws {NotFoundError} When the workspace is not found for this user
- */
-async function assertWorkspaceAccess(workspaceId: string, userId: string) {
-    await getWorkspaceByIdForUser(workspaceId, userId);
-}
 
 /**
  * Lists all learning artifacts in a workspace.
@@ -36,30 +24,12 @@ async function assertWorkspaceAccess(workspaceId: string, userId: string) {
  * @param userId - Authenticated user's id
  * @returns Artifact records ordered by creation time
  *
- * @example Input → Output
- * ```ts
- * await listArtifactsForWorkspace("ws_xyz789", "user_abc123")
- * // → [
- * //   {
- * //     id: "art_001",
- * //     workspaceId: "ws_xyz789",
- * //     type: "FLASHCARDS",
- * //     title: "Flashcards · 8/3/2026",
- * //     status: "READY",
- * //     sourceIds: ["src_001", "src_002"],
- * //     content: { cards: [...] },
- * //     metadata: { generatedAt: "2026-08-03T10:00:00.000Z" },
- * //     createdAt: Date,
- * //     updatedAt: Date
- * //   }
- * // ]
- * ```
  */
 export async function listArtifactsForWorkspace(
     workspaceId: string,
     userId: string,
 ) {
-    await assertWorkspaceAccess(workspaceId, userId);
+    await getWorkspaceByIdForUser(workspaceId, userId);
     return findArtifactsByWorkspaceId(workspaceId);
 }
 
@@ -72,25 +42,13 @@ export async function listArtifactsForWorkspace(
  * @returns Artifact record with content when status is `READY`
  * @throws {NotFoundError} When the artifact does not exist in this workspace
  *
- * @example Input → Output
- * ```ts
- * await getArtifactForWorkspace("ws_xyz789", "art_001", "user_abc123")
- * // → {
- * //   id: "art_001",
- * //   type: "QUIZ",
- * //   title: "Chapter 5 Quiz",
- * //   status: "READY",
- * //   content: { questions: [...] },
- * //   ...
- * // }
- * ```
  */
 export async function getArtifactForWorkspace(
     workspaceId: string,
     artifactId: string,
     userId: string,
 ) {
-    await assertWorkspaceAccess(workspaceId, userId);
+    await getWorkspaceByIdForUser(workspaceId, userId);
 
     const artifact = await findArtifactByIdAndWorkspaceId(
         artifactId,
@@ -116,34 +74,13 @@ export async function getArtifactForWorkspace(
  * @returns New artifact with status `PENDING`
  * @throws {ValidationError} When no ready sources are available
  *
- * @example Input → Output
- * ```ts
- * await createArtifactForWorkspace("ws_xyz789", "user_abc123", {
- *   type: "FLASHCARDS",
- *   title: "ML Chapter 3 Cards",
- *   sourceIds: ["src_001"]
- * })
- * // → {
- * //   id: "art_new456",
- * //   workspaceId: "ws_xyz789",
- * //   type: "FLASHCARDS",
- * //   title: "ML Chapter 3 Cards",
- * //   status: "PENDING",
- * //   sourceIds: ["src_001"],
- * //   content: null,
- * //   metadata: null,
- * //   createdAt: Date,
- * //   updatedAt: Date
- * // }
- * // (Inngest job enqueued to generate content)
- * ```
  */
 export async function createArtifactForWorkspace(
     workspaceId: string,
     userId: string,
     input: CreateArtifactInput,
 ) {
-    await assertWorkspaceAccess(workspaceId, userId);
+    await getWorkspaceByIdForUser(workspaceId, userId);
 
     const context = await gatherSourceContext(
         workspaceId,
@@ -155,7 +92,16 @@ export async function createArtifactForWorkspace(
         type: input.type,
         title:
             input.title?.trim() ||
-            `${defaultArtifactTitle(input.type)} · ${new Date().toLocaleDateString()}`,
+            `${
+                {
+                    SUMMARY: "Summary",
+                    TAKEAWAYS: "Key Takeaways",
+                    FLASHCARDS: "Flashcards",
+                    QUIZ: "Quiz",
+                    MINDMAP: "Mind Map",
+                    REPORT: "AI Report",
+                }[input.type]
+            } · ${new Date().toLocaleDateString()}`,
         sourceIds: context.sourceIds,
         status: "PENDING",
     });
@@ -177,11 +123,6 @@ export async function createArtifactForWorkspace(
  * @returns Resolves when the artifact row is deleted
  * @throws {NotFoundError} When the artifact is not found
  *
- * @example Input → Output
- * ```ts
- * await deleteArtifactForWorkspace("ws_xyz789", "art_001", "user_abc123")
- * // → void
- * ```
  */
 export async function deleteArtifactForWorkspace(
     workspaceId: string,
@@ -206,24 +147,7 @@ export async function deleteArtifactForWorkspace(
  * @returns Updated artifact with `READY` status and generated content
  * @throws When the artifact is missing or generation fails (status set to `FAILED`)
  *
- * @example Input → Output (success)
- * ```ts
- * await processArtifactById("art_001")
- * // → {
- * //   id: "art_001",
- * //   status: "READY",
- * //   content: { cards: [{ front: "...", back: "..." }] },
- * //   metadata: { generatedAt: "2026-08-03T10:05:00.000Z", processingError: undefined }
- * // }
- * ```
  *
- * @example Input → Output (failure)
- * ```ts
- * await processArtifactById("art_broken")
- * // → artifact status set to "FAILED"
- * // → metadata.processingError: "No ready sources found..."
- * // → throws the same error
- * ```
  */
 export async function processArtifactById(artifactId: string) {
     const artifact = await findArtifactById(artifactId);

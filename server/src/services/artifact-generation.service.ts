@@ -75,26 +75,8 @@ const reportSchema = z.object({
  * @returns Combined source text (max 120k chars) and the ids actually used
  * @throws {ValidationError} When no ready sources exist or none have extracted content
  *
- * @example Input → Output
- * ```ts
- * await gatherSourceContext("ws_xyz789", ["src_001", "src_002"])
- * // → {
- * //   text: "# Intro to ML\n\nNeural networks are...\n\n---\n\n# Chapter 2\n\n...",
- * //   sourceIds: ["src_001", "src_002"]
- * // }
- * ```
  *
- * @example Input → Output (all ready sources)
- * ```ts
- * await gatherSourceContext("ws_xyz789")
- * // → { text: "# Source A\n\n...\n\n---\n\n# Source B\n\n...", sourceIds: ["src_001", "src_002", "src_003"] }
- * ```
  *
- * @example Input → Error
- * ```ts
- * await gatherSourceContext("ws_empty", [])
- * // → throws ValidationError("No ready sources found...")
- * ```
  */
 export async function gatherSourceContext(
     workspaceId: string,
@@ -104,10 +86,9 @@ export async function gatherSourceContext(
         status: "READY",
     });
 
-    const selected =
-        sourceIds && sourceIds.length > 0
-            ? sources.filter((source) => sourceIds.includes(source.id))
-            : sources;
+    const selected = sourceIds?.length
+        ? sources.filter((source) => sourceIds.includes(source.id))
+        : sources;
 
     if (selected.length === 0) {
         throw new ValidationError(
@@ -135,20 +116,6 @@ export async function gatherSourceContext(
 }
 
 /**
- * Builds the system prompt shared across all artifact generation types.
- *
- * @param type - Human-readable artifact type label (e.g. `"flashcards"`)
- * @returns System prompt string instructing the model to stay grounded in sources
- */
-function baseSystemPrompt(type: string) {
-    return [
-        `You are Chaibook, an expert learning assistant generating a ${type} from workspace source materials.`,
-        "Use ONLY the provided source content. Do not invent facts not supported by the sources.",
-        "Be clear, educational, and well-structured.",
-    ].join("\n");
-}
-
-/**
  * Generates structured or markdown content for a learning artifact using the AI SDK.
  *
  * @param type - Artifact type (`SUMMARY`, `QUIZ`, `FLASHCARDS`, etc.)
@@ -156,41 +123,18 @@ function baseSystemPrompt(type: string) {
  * @returns Type-specific JSON content stored on the artifact row
  * @throws {ValidationError} When the artifact type is unsupported
  *
- * @example Input → Output (SUMMARY)
- * ```ts
- * await generateArtifactContent("SUMMARY", "# ML Notes\n\nGradient descent...")
- * // → { markdown: "## Overview\n\nGradient descent is..." }
- * ```
  *
- * @example Input → Output (FLASHCARDS)
- * ```ts
- * await generateArtifactContent("FLASHCARDS", sourceText)
- * // → {
- * //   cards: [
- * //     { front: "What is a neuron?", back: "A computational unit that..." },
- * //     { front: "What is backpropagation?", back: "An algorithm that..." }
- * //   ]
- * // }
- * ```
  *
- * @example Input → Output (QUIZ)
- * ```ts
- * await generateArtifactContent("QUIZ", sourceText)
- * // → {
- * //   questions: [{
- * //     question: "Which optimizer adapts learning rates per parameter?",
- * //     options: ["SGD", "Adam", "Momentum", "RMSprop"],
- * //     correctIndex: 1,
- * //     explanation: "Adam combines..."
- * //   }]
- * // }
- * ```
  */
 export async function generateArtifactContent(
     type: ArtifactRecord["type"],
     sourceText: string,
 ) {
-    const system = baseSystemPrompt(type.toLowerCase());
+    const system = [
+        `You are Chaibook, an expert learning assistant generating a ${type.toLowerCase()} from workspace source materials.`,
+        "Use ONLY the provided source content. Do not invent facts not supported by the sources.",
+        "Be clear, educational, and well-structured.",
+    ].join("\n");
 
     switch (type) {
         case "SUMMARY": {
@@ -249,29 +193,4 @@ export async function generateArtifactContent(
         default:
             throw new ValidationError(`Unsupported artifact type: ${type}`);
     }
-}
-
-/**
- * Returns the default display title for an artifact type.
- *
- * @param type - Artifact enum value
- * @returns Human-readable label used when the client omits a custom title
- *
- * @example Input → Output
- * ```ts
- * defaultArtifactTitle("FLASHCARDS") // → "Flashcards"
- * defaultArtifactTitle("QUIZ")       // → "Quiz"
- * defaultArtifactTitle("REPORT")   // → "AI Report"
- * ```
- */
-export function defaultArtifactTitle(type: ArtifactRecord["type"]) {
-    const labels: Record<ArtifactRecord["type"], string> = {
-        SUMMARY: "Summary",
-        TAKEAWAYS: "Key Takeaways",
-        FLASHCARDS: "Flashcards",
-        QUIZ: "Quiz",
-        MINDMAP: "Mind Map",
-        REPORT: "AI Report",
-    };
-    return labels[type];
 }

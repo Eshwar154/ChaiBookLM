@@ -22,27 +22,14 @@ export type TavilySearchResponse = {
 let client: ReturnType<typeof tavily> | null = null;
 
 /**
- * Checks whether Tavily web search is available on this server.
+ * Runs a web search query via Tavily for the chat `web_search` tool.
  *
- * @returns `true` when `TAVILY_API_KEY` is set
+ * @param query - Natural-language search query from the model
+ * @returns Normalized search response with up to 5 results and optional answer summary
+ * @throws When `TAVILY_API_KEY` is not configured
  *
- * @example Input → Output
- * ```ts
- * isTavilyConfigured() // → true (when env var is set)
- * isTavilyConfigured() // → false (when env var is missing)
- * ```
  */
-export function isTavilyConfigured() {
-    return Boolean(process.env.TAVILY_API_KEY?.trim());
-}
-
-/**
- * Returns a singleton Tavily API client.
- *
- * @returns Configured Tavily client
- * @throws When `TAVILY_API_KEY` is missing
- */
-function getTavilyClient() {
+export async function searchWeb(query: string): Promise<TavilySearchResponse> {
     const apiKey = process.env.TAVILY_API_KEY?.trim();
 
     if (!apiKey) {
@@ -53,33 +40,7 @@ function getTavilyClient() {
         client = tavily({ apiKey });
     }
 
-    return client;
-}
-
-/**
- * Runs a web search query via Tavily for the chat `web_search` tool.
- *
- * @param query - Natural-language search query from the model
- * @returns Normalized search response with up to 5 results and optional answer summary
- * @throws When `TAVILY_API_KEY` is not configured
- *
- * @example Input → Output
- * ```ts
- * await searchWeb("latest OpenAI model releases 2026")
- * // → {
- * //   query: "latest OpenAI model releases 2026",
- * //   answer: "OpenAI released...",
- * //   results: [{
- * //     title: "OpenAI Blog",
- * //     url: "https://openai.com/blog/...",
- * //     content: "Today we announced...",
- * //     score: 0.92
- * //   }]
- * // }
- * ```
- */
-export async function searchWeb(query: string): Promise<TavilySearchResponse> {
-    const response = await getTavilyClient().search(query, {
+    const response = await client.search(query, {
         searchDepth: "basic",
         maxResults: 5,
         includeAnswer: true,
@@ -106,25 +67,7 @@ export async function searchWeb(query: string): Promise<TavilySearchResponse> {
  * @param response - Normalized Tavily search response
  * @returns Multi-line string injected into the tool result
  *
- * @example Input → Output
- * ```ts
- * formatTavilyResultsForPrompt({
- *   query: "React 19 features",
- *   answer: "React 19 adds server components improvements.",
- *   results: [{
- *     title: "React Blog",
- *     url: "https://react.dev/blog",
- *     content: "React 19 is here..."
- *   }]
- * })
- * // → "Web search results:\n\nSummary: React 19 adds...\n\n[W1] React Blog (https://react.dev/blog)\nReact 19 is here..."
- * ```
  *
- * @example Input → Output (no results)
- * ```ts
- * formatTavilyResultsForPrompt({ query: "xyz", results: [] })
- * // → "No web results were found."
- * ```
  */
 export function formatTavilyResultsForPrompt(
     response: TavilySearchResponse,
@@ -133,9 +76,10 @@ export function formatTavilyResultsForPrompt(
         return "No web results were found.";
     }
 
-    const blocks = response.results.map((result, index) => {
-        return `[W${index + 1}] ${result.title} (${result.url})\n${result.content}`;
-    });
+    const blocks = response.results.map(
+        (result, index) =>
+            `[W${index + 1}] ${result.title} (${result.url})\n${result.content}`,
+    );
 
     const parts = ["Web search results:"];
 

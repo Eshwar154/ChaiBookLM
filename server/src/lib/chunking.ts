@@ -14,14 +14,6 @@
  * - search for the most relevant chunks for a user question
  * - stay within model token limits
  *
- * @example
- * ```ts
- * {
- *   index: 0,
- *   content: "Machine learning is a subset of AI.",
- *   metadata: { page: 1 }
- * }
- * ```
  */
 export type TextChunk = {
     index: number;
@@ -55,15 +47,6 @@ const SEPARATORS = ["\n\n", "\n", ". ", " ", ""];
  * @param chunkSize - Maximum characters allowed in one merged chunk
  * @returns An array of merged chunk strings
  *
- * @example
- * ```ts
- * mergeSplits(["Hello", "world", "from", "chunking"], " ", 12)
- *  Returns:
- *  [
- *   "Hello world",   // 11 chars — next word would exceed 12
- *   "from chunking"  // remaining splits joined
- * ]
- * ```
  */
 function mergeSplits(splits: string[], separator: string, chunkSize: number) {
     const docs: string[] = [];
@@ -108,28 +91,6 @@ function mergeSplits(splits: string[], separator: string, chunkSize: number) {
  * @param chunkOverlap - Characters repeated between adjacent chunks (character fallback only)
  * @returns Array of non-empty chunk strings (no `index` or `metadata` yet)
  *
- * @example
- * ```ts
- * const text = "Para one.\n\nPara two.\n\nPara three.";
- *
- * splitText(text, 20, 5)
- *  Tries "\n\n" first → splits into 3 paragraphs, merges to fit size 20
- *  Returns something like:
- *  [
- *   "Para one.",
- *   "Para two.",
- *   "Para three."
- * ]
- *
- * splitText("abcdefghijklmnop", 8, 2)
- *  No separator helps → character fallback with overlap
- *  Returns:
- *  [
- *   "abcdefgh",   // chars 0–7
- *   "ghijklmn",   // starts at 6 (8 - 2 overlap)
- *   "klmnop"      // remainder
- * ]
- * ```
  */
 function splitText(text: string, chunkSize: number, chunkOverlap: number) {
     const chunks: string[] = [];
@@ -166,36 +127,6 @@ function splitText(text: string, chunkSize: number, chunkOverlap: number) {
  * @param options.chunkOverlap - Overlap for character-level splits (default: 100)
  * @param options.metadata - Extra fields attached to every chunk (e.g. `{ sourceId: "abc" }`)
  * @returns Array of `TextChunk` ready for embedding/storage
- *
- * @example
- * ```ts
- * const article = `
- * Introduction to RAG.
- *
- * Retrieval-Augmented Generation combines search with LLMs.
- * It helps answers stay grounded in your own documents.
- * `.trim();
- *
- * chunkText(article, { chunkSize: 60, chunkOverlap: 10, metadata: { source: "blog" } })
- *  Returns:
- *  [
- *    {
- *      index: 0,
- *     content: "Introduction to RAG.",
- *      metadata: { source: "blog" }
- *    },
- *    {
- *      index: 1,
- *      content: "Retrieval-Augmented Generation combines search with LLMs.",
- *      metadata: { source: "blog" }
- *    },
- *    {
- *      index: 2,
- *      content: "It helps answers stay grounded in your own documents.",
- *      metadata: { source: "blog" }
- *    }
- *  ]
- * ```
  */
 export function chunkText(
     text: string,
@@ -231,34 +162,6 @@ export function chunkText(
  * @param options.chunkOverlap - Overlap for character-level splits (default: 100)
  * @returns Flat list of chunks from all pages with page metadata
  *
- * @example
- * ```ts
- * const pages = [
- *   "Page 1: Title and abstract content here.",
- *   "Page 2: Methods section with more details.",
- *   "", // empty page — skipped
- * ];
- *
- * chunkPages(pages, { chunkSize: 40, chunkOverlap: 5 })
- * Returns:
- *  [
- *    {
- *      index: 0,
- *      content: "Page 1: Title and abstract content here.",
- *      metadata: { page: 1 }
- *    },
- *    {
- *      index: 1,
- *      content: "Page 2: Methods section with more details.",
- *      metadata: { page: 2 }
- *    }
- *  ]
- *
- *  If page 2 were longer than chunkSize, you'd get multiple chunks
- *  with the same metadata.page but different global indexes:
- *  { index: 2, content: "...", metadata: { page: 2 } }
- *  { index: 3, content: "...", metadata: { page: 2 } }
- * ```
  */
 export function chunkPages(
     pages: string[],

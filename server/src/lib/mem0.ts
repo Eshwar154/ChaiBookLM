@@ -9,20 +9,6 @@ import { MemoryClient } from "mem0ai";
 let client: MemoryClient | null = null;
 
 /**
- * Checks whether Mem0 is available on this server.
- *
- * @returns `true` when `MEM0_API_KEY` is set
- *
- * @example Input → Output
- * ```ts
- * isMem0Configured() // → true | false
- * ```
- */
-export function isMem0Configured() {
-    return Boolean(process.env.MEM0_API_KEY?.trim());
-}
-
-/**
  * Returns a singleton Mem0 API client.
  *
  * @returns Configured `MemoryClient`
@@ -47,20 +33,6 @@ export type Mem0Message = {
     role: "user" | "assistant";
     content: string;
 };
-
-/**
- * Normalizes a date value to ISO string for API responses.
- *
- * @param value - Date, ISO string, or undefined
- * @returns ISO 8601 timestamp string
- */
-function toIsoString(value: Date | string | undefined) {
-    if (!value) {
-        return new Date().toISOString();
-    }
-
-    return value instanceof Date ? value.toISOString() : value;
-}
 
 /** Normalized memory record returned by Chaibook memory APIs. */
 export type AppMemory = {
@@ -88,14 +60,18 @@ function mapMemory(record: {
     categories?: string[];
 }): AppMemory {
     const metadata = record.metadata ?? null;
-    const source =
-        metadata?.source === "manual" ? "manual" : ("learned" as const);
+    const source: AppMemory["source"] =
+        metadata?.source === "manual" ? "manual" : "learned";
+    const createdAt = record.createdAt ?? new Date().toISOString();
+    const updatedAt = record.updatedAt ?? createdAt;
 
     return {
         id: record.id,
         memory: record.memory ?? "",
-        createdAt: toIsoString(record.createdAt),
-        updatedAt: toIsoString(record.updatedAt ?? record.createdAt),
+        createdAt:
+            createdAt instanceof Date ? createdAt.toISOString() : createdAt,
+        updatedAt:
+            updatedAt instanceof Date ? updatedAt.toISOString() : updatedAt,
         metadata,
         categories: record.categories,
         source,
@@ -108,18 +84,10 @@ function mapMemory(record: {
  * @param userId - Authenticated user's id
  * @returns Array of memories, or `[]` when Mem0 is not configured
  *
- * @example Input → Output
- * ```ts
- * await listUserMemories("user_abc123")
- * // → [
- * //   { id: "mem_001", memory: "Prefers concise answers", source: "manual", ... },
- * //   { id: "mem_002", memory: "Studying transformers", source: "learned", ... }
- * // ]
- * ```
  */
 export async function listUserMemories(userId: string) {
-    if (!isMem0Configured()) {
-        return [] as AppMemory[];
+    if (!process.env.MEM0_API_KEY?.trim()) {
+        return [];
     }
 
     const page = await getMem0Client().getAll({
@@ -138,17 +106,10 @@ export async function listUserMemories(userId: string) {
  * @param query - Current user message or search text
  * @returns Top matching memories (up to 8), or `[]` when Mem0 is off or query is empty
  *
- * @example Input → Output
- * ```ts
- * await searchUserMemories("user_abc123", "explain backpropagation simply")
- * // → [
- * //   { id: "mem_002", memory: "User prefers step-by-step explanations", score: ..., ... }
- * // ]
- * ```
  */
 export async function searchUserMemories(userId: string, query: string) {
-    if (!isMem0Configured() || !query.trim()) {
-        return [] as AppMemory[];
+    if (!process.env.MEM0_API_KEY?.trim() || !query.trim()) {
+        return [];
     }
 
     const results = await getMem0Client().search(query, {
@@ -168,21 +129,6 @@ export async function searchUserMemories(userId: string, query: string) {
  * @returns Created memory record
  * @throws When Mem0 returns no created record
  *
- * @example Input → Output
- * ```ts
- * await addUserMemory("user_abc123", {
- *   memory: "I learn best with analogies",
- *   infer: false,
- *   metadata: { source: "manual" }
- * })
- * // → {
- * //   id: "mem_new789",
- * //   memory: "I learn best with analogies",
- * //   source: "manual",
- * //   createdAt: "2026-08-03T10:00:00.000Z",
- * //   ...
- * // }
- * ```
  */
 export async function addUserMemory(
     userId: string,
@@ -192,9 +138,7 @@ export async function addUserMemory(
         metadata?: Record<string, unknown>;
     },
 ) {
-    const client = getMem0Client();
-
-    const created = await client.add(
+    const created = await getMem0Client().add(
         [{ role: "user", content: input.memory }],
         {
             userId,
@@ -219,21 +163,13 @@ export async function addUserMemory(
  * @param metadata - Optional metadata (e.g. `{ source: "learned", conversationId }`)
  * @returns Resolves immediately when Mem0 is off or messages are empty
  *
- * @example Input → Output
- * ```ts
- * await addMemoriesFromMessages("user_abc123", [
- *   { role: "user", content: "I'm preparing for a calculus exam" },
- *   { role: "assistant", content: "Let's focus on derivatives..." }
- * ], { source: "learned", conversationId: "conv_001" })
- * // → void (Mem0 may create inferred memories like "User is preparing for calculus exam")
- * ```
  */
 export async function addMemoriesFromMessages(
     userId: string,
     messages: Mem0Message[],
     metadata?: Record<string, unknown>,
 ) {
-    if (!isMem0Configured() || messages.length === 0) {
+    if (!process.env.MEM0_API_KEY?.trim() || messages.length === 0) {
         return;
     }
 
@@ -252,11 +188,6 @@ export async function addMemoriesFromMessages(
  * @returns Updated memory record
  * @throws When Mem0 returns no updated record
  *
- * @example Input → Output
- * ```ts
- * await updateUserMemory("mem_001", { memory: "Prefers detailed explanations" })
- * // → { id: "mem_001", memory: "Prefers detailed explanations", ... }
- * ```
  */
 export async function updateUserMemory(
     memoryId: string,
@@ -280,11 +211,6 @@ export async function updateUserMemory(
  * @param memoryId - Mem0 memory id to delete
  * @returns Resolves when deletion completes
  *
- * @example Input → Output
- * ```ts
- * await deleteUserMemory("mem_001")
- * // → void
- * ```
  */
 export async function deleteUserMemory(memoryId: string) {
     await getMem0Client().delete(memoryId);

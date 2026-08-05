@@ -14,7 +14,6 @@ import {
     uploadPdfSource,
 } from "../services/source.service.js";
 import { ValidationError } from "../types/app-error.js";
-import { getZodFieldErrors } from "../utils/zod-error.js";
 import {
     bulkDeleteSourcesSchema,
     createSourceSchema,
@@ -27,126 +26,9 @@ import {
     workspaceIdParamSchema,
 } from "../validators/source.validator.js";
 
-function parseWorkspaceId(params: Request["params"]) {
-    const parsed = workspaceIdParamSchema.safeParse(params);
-
-    if (!parsed.success) {
-        throw new ValidationError(
-            "Invalid workspace id",
-            getZodFieldErrors(parsed.error),
-        );
-    }
-
-    return parsed.data;
-}
-
-function parseSourceParams(params: Request["params"]) {
-    const parsed = sourceIdParamSchema.safeParse(params);
-
-    if (!parsed.success) {
-        throw new ValidationError(
-            "Invalid source id",
-            getZodFieldErrors(parsed.error),
-        );
-    }
-
-    return parsed.data;
-}
-
-function parseListQuery(query: Request["query"]) {
-    const parsed = listSourcesQuerySchema.safeParse(query);
-
-    if (!parsed.success) {
-        throw new ValidationError(
-            "Invalid query parameters",
-            getZodFieldErrors(parsed.error),
-        );
-    }
-
-    return parsed.data;
-}
-
-function parseCreateBody(body: unknown) {
-    const parsed = createSourceSchema.safeParse(body);
-
-    if (!parsed.success) {
-        throw new ValidationError(
-            "Validation failed",
-            getZodFieldErrors(parsed.error),
-        );
-    }
-
-    return parsed.data;
-}
-
-function parseImportWebsiteBody(body: unknown) {
-    const parsed = importWebsiteSchema.safeParse(body);
-
-    if (!parsed.success) {
-        throw new ValidationError(
-            "Validation failed",
-            getZodFieldErrors(parsed.error),
-        );
-    }
-
-    return parsed.data;
-}
-
-function parseImportYoutubeBody(body: unknown) {
-    const parsed = importYoutubeSchema.safeParse(body);
-
-    if (!parsed.success) {
-        throw new ValidationError(
-            "Validation failed",
-            getZodFieldErrors(parsed.error),
-        );
-    }
-
-    return parsed.data;
-}
-
-function parseBulkDeleteBody(body: unknown) {
-    const parsed = bulkDeleteSourcesSchema.safeParse(body);
-
-    if (!parsed.success) {
-        throw new ValidationError(
-            "Validation failed",
-            getZodFieldErrors(parsed.error),
-        );
-    }
-
-    return parsed.data;
-}
-
-function parseReprocessBody(body: unknown) {
-    const parsed = reprocessSourcesSchema.safeParse(body ?? {});
-
-    if (!parsed.success) {
-        throw new ValidationError(
-            "Validation failed",
-            getZodFieldErrors(parsed.error),
-        );
-    }
-
-    return parsed.data;
-}
-
-function parseImportWebSearchBody(body: unknown) {
-    const parsed = importWebSearchSchema.safeParse(body);
-
-    if (!parsed.success) {
-        throw new ValidationError(
-            "Validation failed",
-            getZodFieldErrors(parsed.error),
-        );
-    }
-
-    return parsed.data;
-}
-
 export async function listSources(req: Request, res: Response) {
-    const { workspaceId } = parseWorkspaceId(req.params);
-    const filters = parseListQuery(req.query);
+    const { workspaceId } = workspaceIdParamSchema.parse(req.params);
+    const filters = listSourcesQuerySchema.parse(req.query);
     const sources = await listSourcesForWorkspace(
         workspaceId,
         req.session.user.id,
@@ -156,7 +38,7 @@ export async function listSources(req: Request, res: Response) {
 }
 
 export async function getSource(req: Request, res: Response) {
-    const { workspaceId, sourceId } = parseSourceParams(req.params);
+    const { workspaceId, sourceId } = sourceIdParamSchema.parse(req.params);
     const source = await getSourceForWorkspace(
         workspaceId,
         sourceId,
@@ -166,7 +48,7 @@ export async function getSource(req: Request, res: Response) {
 }
 
 export async function getSourceChunks(req: Request, res: Response) {
-    const { workspaceId, sourceId } = parseSourceParams(req.params);
+    const { workspaceId, sourceId } = sourceIdParamSchema.parse(req.params);
     const result = await getSourceChunksForWorkspace(
         workspaceId,
         sourceId,
@@ -176,8 +58,8 @@ export async function getSourceChunks(req: Request, res: Response) {
 }
 
 export async function createSource(req: Request, res: Response) {
-    const { workspaceId } = parseWorkspaceId(req.params);
-    const input = parseCreateBody(req.body);
+    const { workspaceId } = workspaceIdParamSchema.parse(req.params);
+    const input = createSourceSchema.parse(req.body);
     const source = await createTextOrMarkdownSource(
         workspaceId,
         req.session.user.id,
@@ -187,7 +69,7 @@ export async function createSource(req: Request, res: Response) {
 }
 
 export async function uploadPdf(req: Request, res: Response) {
-    const { workspaceId } = parseWorkspaceId(req.params);
+    const { workspaceId } = workspaceIdParamSchema.parse(req.params);
 
     if (!req.file) {
         throw new ValidationError("PDF file is required");
@@ -207,8 +89,8 @@ export async function uploadPdf(req: Request, res: Response) {
 }
 
 export async function importWebsite(req: Request, res: Response) {
-    const { workspaceId } = parseWorkspaceId(req.params);
-    const input = parseImportWebsiteBody(req.body);
+    const { workspaceId } = workspaceIdParamSchema.parse(req.params);
+    const input = importWebsiteSchema.parse(req.body);
     const source = await importWebsiteSource(
         workspaceId,
         req.session.user.id,
@@ -218,8 +100,8 @@ export async function importWebsite(req: Request, res: Response) {
 }
 
 export async function importYoutube(req: Request, res: Response) {
-    const { workspaceId } = parseWorkspaceId(req.params);
-    const input = parseImportYoutubeBody(req.body);
+    const { workspaceId } = workspaceIdParamSchema.parse(req.params);
+    const input = importYoutubeSchema.parse(req.body);
     const source = await importYoutubeSource(
         workspaceId,
         req.session.user.id,
@@ -229,7 +111,7 @@ export async function importYoutube(req: Request, res: Response) {
 }
 
 export async function deleteSource(req: Request, res: Response) {
-    const { workspaceId, sourceId } = parseSourceParams(req.params);
+    const { workspaceId, sourceId } = sourceIdParamSchema.parse(req.params);
     await deleteSourceForWorkspace(
         workspaceId,
         sourceId,
@@ -239,8 +121,8 @@ export async function deleteSource(req: Request, res: Response) {
 }
 
 export async function bulkDeleteSources(req: Request, res: Response) {
-    const { workspaceId } = parseWorkspaceId(req.params);
-    const input = parseBulkDeleteBody(req.body);
+    const { workspaceId } = workspaceIdParamSchema.parse(req.params);
+    const input = bulkDeleteSourcesSchema.parse(req.body);
     await bulkDeleteSourcesForWorkspace(
         workspaceId,
         req.session.user.id,
@@ -250,8 +132,8 @@ export async function bulkDeleteSources(req: Request, res: Response) {
 }
 
 export async function reprocessSources(req: Request, res: Response) {
-    const { workspaceId } = parseWorkspaceId(req.params);
-    const input = parseReprocessBody(req.body);
+    const { workspaceId } = workspaceIdParamSchema.parse(req.params);
+    const input = reprocessSourcesSchema.parse(req.body ?? {});
     const result = await reprocessSourcesForWorkspace(
         workspaceId,
         req.session.user.id,
@@ -261,7 +143,7 @@ export async function reprocessSources(req: Request, res: Response) {
 }
 
 export async function reprocessSource(req: Request, res: Response) {
-    const { workspaceId, sourceId } = parseSourceParams(req.params);
+    const { workspaceId, sourceId } = sourceIdParamSchema.parse(req.params);
     await reprocessSourceForWorkspace(
         workspaceId,
         sourceId,
@@ -271,8 +153,8 @@ export async function reprocessSource(req: Request, res: Response) {
 }
 
 export async function importWebSearch(req: Request, res: Response) {
-    const { workspaceId } = parseWorkspaceId(req.params);
-    const input = parseImportWebSearchBody(req.body);
+    const { workspaceId } = workspaceIdParamSchema.parse(req.params);
+    const input = importWebSearchSchema.parse(req.body);
     const source = await importWebSearchSource(
         workspaceId,
         req.session.user.id,

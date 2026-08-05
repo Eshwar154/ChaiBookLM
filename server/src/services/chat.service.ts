@@ -27,15 +27,15 @@ import {
     type UIMessage,
 } from "ai";
 import {
+    CHAT_MODEL,
+    CHAT_MODELS,
     CONVERSATION_SUMMARY_INTERVAL,
     RECENT_MESSAGE_WINDOW,
-    resolveChatModel,
 } from "../lib/ai-config.js";
 import { enqueueConversationSummarize } from "../lib/conversation-events.js";
 import {
     buildChatSystemPrompt,
     retrieveWorkspaceContext,
-    toChatCitations,
 } from "../lib/rag/retrieve.js";
 import {
     createConversationRecord,
@@ -53,7 +53,6 @@ import {
 import { addMemoriesFromMessages, searchUserMemories } from "../lib/mem0.js";
 import {
     formatTavilyResultsForPrompt,
-    isTavilyConfigured,
     searchWeb,
     type TavilySearchResponse,
 } from "../lib/tavily.js";
@@ -65,56 +64,6 @@ import {
 } from "../utils/chat-message.js";
 import { getWorkspaceByIdForUser } from "./workspace.service.js";
 
-type WebCitation = {
-    sourceType: "WEB";
-    sourceTitle: string;
-    url: string;
-    excerpt: string;
-};
-
-/**
- * Converts Tavily search results into citation objects stored on assistant messages.
- *
- * @param response - Raw Tavily API response
- * @returns Web citation array with truncated excerpts
- *
- * @example Input → Output
- * ```ts
- * toWebCitations({
- *   results: [{
- *     title: "React Docs",
- *     url: "https://react.dev",
- *     content: "React is a JavaScript library..."
- *   }]
- * })
- * // → [{
- * //   sourceType: "WEB",
- * //   sourceTitle: "React Docs",
- * //   url: "https://react.dev",
- * //   excerpt: "React is a JavaScript library..." // max 280 chars
- * // }]
- * ```
- */
-function toWebCitations(response: TavilySearchResponse): WebCitation[] {
-    return response.results.map((result) => ({
-        sourceType: "WEB" as const,
-        sourceTitle: result.title,
-        url: result.url,
-        excerpt: result.content.slice(0, 280),
-    }));
-}
-
-/**
- * Verifies the user owns the workspace before any chat operation proceeds.
- *
- * @param workspaceId - Workspace being accessed
- * @param userId - Authenticated user's id
- * @throws {NotFoundError} When the workspace is not found for this user
- */
-async function assertWorkspaceAccess(workspaceId: string, userId: string) {
-    await getWorkspaceByIdForUser(workspaceId, userId);
-}
-
 /**
  * Lists all conversations in a workspace for the sidebar/history UI.
  *
@@ -122,27 +71,12 @@ async function assertWorkspaceAccess(workspaceId: string, userId: string) {
  * @param userId - Authenticated user's id
  * @returns Conversation records ordered by most recent activity
  *
- * @example Input → Output
- * ```ts
- * await listConversationsForWorkspace("ws_xyz789", "user_abc123")
- * // → [
- * //   {
- * //     id: "conv_001",
- * //     workspaceId: "ws_xyz789",
- * //     title: "What is RAG?",
- * //     summary: "The user asked about retrieval-augmented generation...",
- * //     summaryMessageCount: 20,
- * //     createdAt: Date,
- * //     updatedAt: Date
- * //   }
- * // ]
- * ```
  */
 export async function listConversationsForWorkspace(
     workspaceId: string,
     userId: string,
 ) {
-    await assertWorkspaceAccess(workspaceId, userId);
+    await getWorkspaceByIdForUser(workspaceId, userId);
     return findConversationsByWorkspaceId(workspaceId);
 }
 
@@ -157,26 +91,13 @@ export async function listConversationsForWorkspace(
  * @param title - Optional display title
  * @returns New conversation record
  *
- * @example Input → Output
- * ```ts
- * await createConversationForWorkspace("ws_xyz789", "user_abc123", "Study Session")
- * // → {
- * //   id: "conv_new456",
- * //   workspaceId: "ws_xyz789",
- * //   title: "Study Session",
- * //   summary: null,
- * //   summaryMessageCount: null,
- * //   createdAt: Date,
- * //   updatedAt: Date
- * // }
- * ```
  */
 export async function createConversationForWorkspace(
     workspaceId: string,
     userId: string,
     title?: string,
 ) {
-    await assertWorkspaceAccess(workspaceId, userId);
+    await getWorkspaceByIdForUser(workspaceId, userId);
     return createConversationRecord(workspaceId, title);
 }
 
@@ -189,34 +110,13 @@ export async function createConversationForWorkspace(
  * @returns Message rows with role, content, citations, and timestamps
  * @throws {NotFoundError} When the conversation does not exist in this workspace
  *
- * @example Input → Output
- * ```ts
- * await getConversationMessagesForWorkspace("ws_xyz789", "conv_001", "user_abc123")
- * // → [
- * //   {
- * //     id: "msg_001",
- * //     conversationId: "conv_001",
- * //     role: "USER",
- * //     content: "What is gradient descent?",
- * //     citations: null,
- * //     createdAt: Date
- * //   },
- * //   {
- * //     id: "msg_002",
- * //     role: "ASSISTANT",
- * //     content: "Gradient descent is an optimization algorithm...",
- * //     citations: [{ sourceType: "PDF", sourceTitle: "ML Notes", ... }],
- * //     createdAt: Date
- * //   }
- * // ]
- * ```
  */
 export async function getConversationMessagesForWorkspace(
     workspaceId: string,
     conversationId: string,
     userId: string,
 ) {
-    await assertWorkspaceAccess(workspaceId, userId);
+    await getWorkspaceByIdForUser(workspaceId, userId);
 
     const conversation = await findConversationByIdAndWorkspaceId(
         conversationId,
@@ -239,18 +139,13 @@ export async function getConversationMessagesForWorkspace(
  * @returns Resolves when the conversation row is deleted
  * @throws {NotFoundError} When the conversation does not exist
  *
- * @example Input → Output
- * ```ts
- * await deleteConversationForWorkspace("ws_xyz789", "conv_001", "user_abc123")
- * // → void
- * ```
  */
 export async function deleteConversationForWorkspace(
     workspaceId: string,
     conversationId: string,
     userId: string,
 ) {
-    await assertWorkspaceAccess(workspaceId, userId);
+    await getWorkspaceByIdForUser(workspaceId, userId);
 
     const conversation = await findConversationByIdAndWorkspaceId(
         conversationId,
@@ -273,17 +168,7 @@ export async function deleteConversationForWorkspace(
  * @returns Conversation record (existing or newly created)
  * @throws {NotFoundError} When `conversationId` is provided but not found
  *
- * @example Input → Output (existing conversation)
- * ```ts
- * await resolveConversation("ws_xyz789", "conv_001", "Follow-up question")
- * // → { id: "conv_001", title: "What is RAG?", ... }
- * ```
  *
- * @example Input → Output (new conversation)
- * ```ts
- * await resolveConversation("ws_xyz789", undefined, "Explain backpropagation")
- * // → { id: "conv_new789", title: "Explain backpropagation", summary: null, ... }
- * ```
  */
 async function resolveConversation(
     workspaceId: string,
@@ -310,73 +195,6 @@ async function resolveConversation(
 }
 
 /**
- * Limits how many recent UI messages are sent to the model when a summary exists.
- *
- * Older turns are represented by `conversation.summary` instead of full history.
- *
- * @param messages - Full UI message array from the client
- * @param hasSummary - Whether the conversation has a rolling summary
- * @returns All messages, or the last {@link RECENT_MESSAGE_WINDOW} when summarized
- *
- * @example Input → Output (with summary, 30 messages)
- * ```ts
- * trimMessagesForContext(messages, true)
- * // → messages.slice(-RECENT_MESSAGE_WINDOW)  // e.g. last 12 messages
- * ```
- *
- * @example Input → Output (no summary)
- * ```ts
- * trimMessagesForContext(messages, false)
- * // → messages (unchanged)
- * ```
- */
-function trimMessagesForContext(
-    messages: UIMessage[],
-    hasSummary: boolean,
-): UIMessage[] {
-    if (!hasSummary || messages.length <= RECENT_MESSAGE_WINDOW) {
-        return messages;
-    }
-
-    return messages.slice(-RECENT_MESSAGE_WINDOW);
-}
-
-/**
- * Enqueues a background summary job every N messages (see {@link CONVERSATION_SUMMARY_INTERVAL}).
- *
- * @param conversationId - Conversation to summarize
- * @param userId - Owner for Mem0 extraction in the summary worker
- * @param messageCount - Total persisted messages after the latest reply
- * @returns Resolves when the Inngest event is sent, or immediately if not due
- *
- * @example Input → Output (summary due at 20 messages)
- * ```ts
- * await maybeEnqueueConversationSummary("conv_001", "user_abc123", 20)
- * // → void (Inngest event: conversation/summarize enqueued)
- * ```
- *
- * @example Input → Output (not due)
- * ```ts
- * await maybeEnqueueConversationSummary("conv_001", "user_abc123", 19)
- * // → void (no-op)
- * ```
- */
-async function maybeEnqueueConversationSummary(
-    conversationId: string,
-    userId: string,
-    messageCount: number,
-) {
-    if (
-        messageCount === 0 ||
-        messageCount % CONVERSATION_SUMMARY_INTERVAL !== 0
-    ) {
-        return;
-    }
-
-    await enqueueConversationSummarize({ conversationId, userId });
-}
-
-/**
  * Main RAG chat endpoint: streams an AI reply with workspace context and optional web search.
  *
  * **Pipeline:**
@@ -394,42 +212,7 @@ async function maybeEnqueueConversationSummary(
  * @throws {ValidationError} When no user message text is present
  * @throws {NotFoundError} When conversation or workspace is not found
  *
- * @example Input
- * ```ts
- * await streamWorkspaceChat(res, "ws_xyz789", "user_abc123", {
- *   conversationId: "conv_001",          // optional — omit for new chat
- *   messages: [{
- *     id: "msg_ui_1",
- *     role: "user",
- *     parts: [{ type: "text", text: "What is gradient descent?" }]
- *   }],
- *   model: "gpt-4o-mini",                // optional — falls back to workspace default
- *   webSearch: true                      // optional — enables Tavily tool when configured
- * })
- * ```
  *
- * @example Output (HTTP response)
- * ```ts
- * // Response headers:
- * //   Content-Type: text/event-stream (UI message stream)
- * //   X-Conversation-Id: "conv_001"
- * //
- * // Response body: streamed UIMessage chunks (tokens appear incrementally)
- * //
- * // Side effects after stream completes:
- * //   USER message already saved
- * //   ASSISTANT message saved with citations, e.g.:
- * //   {
- * //     role: "ASSISTANT",
- * //     content: "Gradient descent is an optimization algorithm...",
- * //     citations: [{
- * //       sourceType: "PDF",
- * //       sourceTitle: "ML Notes",
- * //       excerpt: "...",
- * //       page: 3
- * //     }]
- * //   }
- * ```
  */
 export async function streamWorkspaceChat(
     res: Response,
@@ -443,8 +226,11 @@ export async function streamWorkspaceChat(
     },
 ) {
     const workspace = await getWorkspaceByIdForUser(workspaceId, userId);
-    const chatModel = resolveChatModel(input.model ?? workspace.defaultModel);
-    const webSearchEnabled = Boolean(input.webSearch) && isTavilyConfigured();
+    const requestedModel = input.model ?? workspace.defaultModel;
+    const chatModel =
+        CHAT_MODELS.find((model) => model === requestedModel) ?? CHAT_MODEL;
+    const webSearchEnabled =
+        input.webSearch === true && !!process.env.TAVILY_API_KEY?.trim();
 
     const userText = getLastUserMessageText(input.messages);
     if (!userText) {
@@ -468,7 +254,16 @@ export async function streamWorkspaceChat(
         searchUserMemories(userId, userText),
     ]);
 
-    const citations = toChatCitations(retrievedChunks);
+    const citations = retrievedChunks.map((chunk) => ({
+        sourceId: chunk.sourceId,
+        sourceTitle: chunk.sourceTitle,
+        sourceType: chunk.sourceType,
+        chunkId: chunk.chunkId,
+        chunkIndex: chunk.chunkIndex,
+        page: chunk.page,
+        excerpt: chunk.text.slice(0, 280),
+        score: chunk.score,
+    }));
     const systemPrompt = buildChatSystemPrompt({
         chunks: retrievedChunks,
         conversationSummary: conversation.summary,
@@ -476,10 +271,11 @@ export async function streamWorkspaceChat(
         webSearchEnabled,
     });
 
-    const contextMessages = trimMessagesForContext(
-        input.messages,
-        Boolean(conversation.summary),
-    );
+    const contextMessages =
+        conversation.summary &&
+        input.messages.length > RECENT_MESSAGE_WINDOW
+            ? input.messages.slice(-RECENT_MESSAGE_WINDOW)
+            : input.messages;
 
     let webSearchResults: TavilySearchResponse | null = null;
 
@@ -529,18 +325,20 @@ export async function streamWorkspaceChat(
             }
 
             const webCitations = webSearchResults
-                ? toWebCitations(webSearchResults)
+                ? webSearchResults.results.map((result) => ({
+                      sourceType: "WEB" as const,
+                      sourceTitle: result.title,
+                      url: result.url,
+                      excerpt: result.content.slice(0, 280),
+                  }))
                 : [];
-            const allCitations =
-                webCitations.length > 0
-                    ? [...citations, ...webCitations]
-                    : citations;
+            const allCitations = [...citations, ...webCitations];
 
             await createMessageRecord({
                 conversationId: conversation.id,
                 role: "ASSISTANT",
                 content: assistantText,
-                citations: allCitations.length > 0 ? allCitations : citations,
+                citations: allCitations,
             });
 
             await touchConversation(conversation.id);
@@ -555,11 +353,15 @@ export async function streamWorkspaceChat(
                 conversation.id,
             );
 
-            await maybeEnqueueConversationSummary(
-                conversation.id,
-                userId,
-                messageCount,
-            );
+            if (
+                messageCount > 0 &&
+                messageCount % CONVERSATION_SUMMARY_INTERVAL === 0
+            ) {
+                await enqueueConversationSummarize({
+                    conversationId: conversation.id,
+                    userId,
+                });
+            }
 
             void addMemoriesFromMessages(
                 userId,
