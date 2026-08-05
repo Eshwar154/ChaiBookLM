@@ -6,10 +6,7 @@ import {
     findConversationById,
     updateConversationSummary,
 } from "../repositories/conversation.repository.js";
-import {
-    findMessagesByConversationId,
-    countMessagesByConversationId,
-} from "../repositories/message.repository.js";
+import { findMessagesByConversationId } from "../repositories/message.repository.js";
 import { NotFoundError } from "../types/app-error.js";
 
 /**
@@ -67,11 +64,9 @@ export async function summarizeConversationById(
             .join("\n"),
     });
 
-    const messageCount = await countMessagesByConversationId(conversationId);
-
     const updated = await updateConversationSummary(conversationId, {
         summary: summary.trim(),
-        summaryMessageCount: messageCount,
+        summaryMessageCount: messages.length,
     });
 
     const recentMessages = messages.slice(-16).map((message) => ({

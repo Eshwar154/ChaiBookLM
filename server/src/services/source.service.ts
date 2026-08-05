@@ -187,7 +187,7 @@ export async function importWebsiteSource(
     return createAndProcessSource({
         workspaceId,
         type: "WEBSITE",
-        title: input.title?.trim() || scraped.title || input.url,
+        title: input.title || scraped.title || input.url,
         content: scraped.markdown,
         url: scraped.sourceUrl,
         status: "PENDING",
@@ -218,7 +218,7 @@ export async function importYoutubeSource(
     return createAndProcessSource({
         workspaceId,
         type: "YOUTUBE",
-        title: input.title?.trim() || `YouTube: ${transcript.videoId}`,
+        title: input.title || `YouTube: ${transcript.videoId}`,
         content: transcript.content,
         url: input.url,
         status: "PENDING",

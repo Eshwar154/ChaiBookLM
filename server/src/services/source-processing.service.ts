@@ -26,7 +26,6 @@ import {
     upsertSourceVectors,
 } from "../lib/pinecone.js";
 import {
-    countChunksBySourceId,
     createSourceChunks,
     deleteChunksBySourceId,
     findChunksBySourceId,
@@ -65,9 +64,10 @@ type SourceMetadata = {
  *
  */
 async function extractSourceText(source: SourceRecord) {
-    if (source.content?.trim()) {
+    const text = source.content?.trim();
+    if (text) {
         return {
-            text: source.content.trim(),
+            text,
             pageCount: undefined,
             pages: undefined,
         };
@@ -313,10 +313,6 @@ export async function removeSourceFromIndex(
  *
  */
 export async function listChunksForSource(sourceId: string) {
-    const [chunks, count] = await Promise.all([
-        findChunksBySourceId(sourceId),
-        countChunksBySourceId(sourceId),
-    ]);
-
-    return { chunks, count };
+    const chunks = await findChunksBySourceId(sourceId);
+    return { chunks, count: chunks.length };
 }

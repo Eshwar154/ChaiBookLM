@@ -35,10 +35,6 @@ export async function retrieveWorkspaceContext(
     query: string,
 ): Promise<RetrievedChunk[]> {
     const [embedding] = await embedTexts([query]);
-    if (!embedding) {
-        return [];
-    }
-
     const matches = await queryWorkspaceVectors(
         workspaceId,
         embedding,
@@ -123,11 +119,9 @@ export function buildChatSystemPrompt(input: {
         );
     }
 
-    if (input.conversationSummary?.trim()) {
-        sections.push(
-            "Earlier conversation summary:",
-            input.conversationSummary.trim(),
-        );
+    const summary = input.conversationSummary?.trim();
+    if (summary) {
+        sections.push("Earlier conversation summary:", summary);
     }
 
     if (input.chunks.length === 0) {

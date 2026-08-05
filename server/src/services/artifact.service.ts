@@ -91,7 +91,7 @@ export async function createArtifactForWorkspace(
         workspaceId,
         type: input.type,
         title:
-            input.title?.trim() ||
+            input.title ||
             `${
                 {
                     SUMMARY: "Summary",

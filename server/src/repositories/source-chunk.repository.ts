@@ -57,9 +57,3 @@ export function findChunksBySourceId(sourceId: string) {
         orderBy: { index: "asc" },
     });
 }
-
-export function countChunksBySourceId(sourceId: string) {
-    return prisma.sourceChunk.count({
-        where: { sourceId },
-    });
-}

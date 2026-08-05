@@ -174,7 +174,7 @@ export function chunkPages(
     let index = 0;
 
     for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
-        const pageText = pages[pageIndex]?.trim();
+        const pageText = pages[pageIndex].trim();
         if (!pageText) {
             continue;
         }

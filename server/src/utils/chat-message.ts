@@ -31,7 +31,7 @@ export function getTextFromUIMessage(message: UIMessage) {
 export function getLastUserMessageText(messages: UIMessage[]) {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
         const message = messages[index];
-        if (message?.role === "user") {
+        if (message.role === "user") {
             const text = getTextFromUIMessage(message).trim();
             if (text) {
                 return text;

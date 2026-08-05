@@ -96,16 +96,19 @@ export async function gatherSourceContext(
         );
     }
 
-    const missingContent = selected.filter((source) => !source.content?.trim());
-    if (missingContent.length === selected.length) {
+    const withContent = selected.flatMap((source) => {
+        const content = source.content?.trim();
+        return content ? [{ title: source.title, content }] : [];
+    });
+
+    if (withContent.length === 0) {
         throw new ValidationError(
             "Selected sources have no extracted content yet.",
         );
     }
 
-    const text = selected
-        .filter((source) => source.content?.trim())
-        .map((source) => `# ${source.title}\n\n${source.content!.trim()}`)
+    const text = withContent
+        .map((source) => `# ${source.title}\n\n${source.content}`)
         .join("\n\n---\n\n")
         .slice(0, MAX_CONTEXT_CHARS);
 
