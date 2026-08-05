@@ -1,9 +1,3 @@
-/**
- * Mem0 long-term memory integration for user facts and learned preferences.
- *
- * Gracefully no-ops when `MEM0_API_KEY` is not configured (returns empty arrays).
- */
-
 import { MemoryClient } from "mem0ai";
 
 let client: MemoryClient | null = null;

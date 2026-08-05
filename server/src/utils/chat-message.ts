@@ -1,6 +1,3 @@
-/**
- * Helpers for converting between AI SDK UI messages and persisted chat records.
- */
 
 import type { UIMessage } from "ai";
 

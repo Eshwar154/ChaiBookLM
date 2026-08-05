@@ -1,4 +1,4 @@
-import { generateObject, generateText } from "ai";
+import { generateText, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { CHAT_MODEL } from "../lib/ai-config.js";
@@ -149,49 +149,49 @@ export async function generateArtifactContent(
             return { markdown: result.text };
         }
         case "TAKEAWAYS": {
-            const result = await generateObject({
+            const result = await generateText({
                 model: openai(CHAT_MODEL),
                 system,
-                schema: takeawaysSchema,
+                output: Output.object({ schema: takeawaysSchema }),
                 prompt: `Extract the most important key takeaways as concise bullet points from:\n\n${sourceText}`,
             });
-            return result.object;
+            return result.output;
         }
         case "FLASHCARDS": {
-            const result = await generateObject({
+            const result = await generateText({
                 model: openai(CHAT_MODEL),
                 system,
-                schema: flashcardsSchema,
+                output: Output.object({ schema: flashcardsSchema }),
                 prompt: `Create study flashcards (front/back) covering the main concepts from:\n\n${sourceText}`,
             });
-            return result.object;
+            return result.output;
         }
         case "QUIZ": {
-            const result = await generateObject({
+            const result = await generateText({
                 model: openai(CHAT_MODEL),
                 system,
-                schema: quizSchema,
+                output: Output.object({ schema: quizSchema }),
                 prompt: `Create a multiple-choice quiz with explanations from:\n\n${sourceText}`,
             });
-            return result.object;
+            return result.output;
         }
         case "MINDMAP": {
-            const result = await generateObject({
+            const result = await generateText({
                 model: openai(CHAT_MODEL),
                 system,
-                schema: mindmapSchema,
+                output: Output.object({ schema: mindmapSchema }),
                 prompt: `Create a mind map as nodes and edges. Use a central topic node and branch out logically from:\n\n${sourceText}`,
             });
-            return result.object;
+            return result.output;
         }
         case "REPORT": {
-            const result = await generateObject({
+            const result = await generateText({
                 model: openai(CHAT_MODEL),
                 system,
-                schema: reportSchema,
+                output: Output.object({ schema: reportSchema }),
                 prompt: `Write a structured long-form report with sections and a full markdown version from:\n\n${sourceText}`,
             });
-            return result.object;
+            return result.output;
         }
         default:
             throw new ValidationError(`Unsupported artifact type: ${type}`);

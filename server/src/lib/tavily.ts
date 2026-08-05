@@ -1,8 +1,3 @@
-/**
- * Tavily web search integration for live chat web search tool.
- *
- * Requires `TAVILY_API_KEY` in the environment.
- */
 
 import { tavily } from "@tavily/core";
 

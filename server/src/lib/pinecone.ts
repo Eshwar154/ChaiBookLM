@@ -1,12 +1,3 @@
-/**
- * Pinecone vector store integration for workspace-scoped RAG.
- *
- * Each workspace uses a Pinecone namespace (`workspaceId`).
- * Vector metadata stores chunk text and source info for retrieval without Postgres joins.
- *
- * Requires `PINECONE_API_KEY` and optionally `PINECONE_INDEX` (default: `"chaibook"`).
- */
-
 import {
     Pinecone,
     type Index,
@@ -97,7 +88,7 @@ export async function ensurePineconeIndex() {
  */
 export async function getPineconeIndex(): Promise<Index> {
     await ensurePineconeIndex();
-    return getPineconeClient().index(indexName);
+    return getPineconeClient().index({name:indexName});
 }
 
 /** Metadata stored on each Pinecone vector for RAG retrieval and citations. */

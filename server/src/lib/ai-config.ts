@@ -1,8 +1,3 @@
-/**
- * Central AI and RAG configuration constants for Chaibook.
- *
- * Used by chat, embeddings, chunking, and conversation memory services.
- */
 
 /** Default chat model when the client or workspace does not specify one. */
 export const CHAT_MODEL = "gpt-4o-mini";
