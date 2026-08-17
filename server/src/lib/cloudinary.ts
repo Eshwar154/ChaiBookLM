@@ -3,7 +3,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { ValidationError } from "../types/app-error.js";
 
 const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET ?? "dt2jgaj48";
+const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET || "dt2jgaj48";
 const apiKey = process.env.CLOUDINARY_API_KEY;
 const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
